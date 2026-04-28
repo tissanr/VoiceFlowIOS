@@ -18,7 +18,7 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | Spec | Owns | Spec status | Implementation |
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟥 Not started |
-| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v1) | 🟧 In progress (App Group entitlements and shared models wired; `SharedStoreClient` pending) |
+| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v1) | 🟧 In progress (`PendingInsert` shared-store handoff wired; SwiftData history/vocabulary store pending) |
 | [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v1) | 🟥 Not started |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟥 Not started |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
@@ -69,7 +69,7 @@ Spikes (each must produce a written verdict):
 
 - **In-keyboard recording** — microphone + `SFSpeechRecognizer` inside the Keyboard Extension on the chosen iOS baseline; measure peak memory, latency, stability over 5 min of repeated 10 s dictations. Verdict: primary flow viable / not viable / device-class dependent. (See [performance-and-memory](docs/specs/performance-and-memory.md), [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md).)
 - **Open Access** — confirm `openURL` and microphone-in-extension behavior with and without Open Access. Verdict: feature matrix. (See [privacy-and-app-review](docs/specs/privacy-and-app-review.md).)
-- **App Group store** — implement `SharedStoreClient` with the generation-counter protocol; verify cross-process consistency under contention. (See [data-and-storage](docs/specs/data-and-storage.md).)
+- **App Group store** — `SharedStoreClient` with the generation-counter protocol is implemented for `PendingInsert`; verify cross-process consistency under contention. (See [data-and-storage](docs/specs/data-and-storage.md).)
 - **Insert** — insert in Notes, Mail, Messages, Safari, plus a known masked field. (See [keyboard-and-insert](docs/specs/keyboard-and-insert.md).)
 - **Context** — read context before / after cursor; verify auto-capitalization and spacing logic.
 - **Audio** — interruption tests (call, Siri, Focus, headphone unplug) for both flows.

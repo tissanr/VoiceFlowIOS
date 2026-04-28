@@ -1,7 +1,7 @@
 # Spec: Data & Storage
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** In progress (App Group entitlements and shared model package wired; `SharedStoreClient` pending)
+> **Implementation status:** In progress (App Group entitlements, shared model package, and `PendingInsert` `SharedStoreClient` wired; SwiftData history/vocabulary store pending)
 > **Last updated:** 2026-04-28
 > **Owners:** iOS
 
@@ -35,7 +35,7 @@ The Keyboard Extension never opens the heavy store at launch; it only opens User
 
 The SwiftData decision is documented in [../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md). If the App Group store contention spike shows SwiftData is unreliable for app/extension access patterns, switch history and vocabulary to shared SQLite before Phase 1.
 
-The extension-safe model definitions live in the local Swift package at [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/VoiceFlowShared).
+The extension-safe model definitions and `PendingInsert` shared-store client live in the local Swift package at [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/VoiceFlowShared).
 
 ---
 
