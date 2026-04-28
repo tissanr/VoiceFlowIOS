@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
@@ -9,10 +10,42 @@ xcuserdata/
 *.hmap
 
 ## App packaging
+=======
+# macOS
+.DS_Store
+
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager
+.build/
+Package.resolved
+
+# CocoaPods / Carthage / SwiftPM-generated dependency folders
+Pods/
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+# App artifacts
+>>>>>>> 43bff93 (Set up Codex project files and iOS roadmap)
 *.ipa
 *.dSYM.zip
 *.dSYM
 
+<<<<<<< HEAD
 ## Playgrounds
 timeline.xctimeline
 playground.xcworkspace
@@ -60,3 +93,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+=======
+# Local config
+*.xcconfig.local
+.env
+.env.*
+>>>>>>> 43bff93 (Set up Codex project files and iOS roadmap)

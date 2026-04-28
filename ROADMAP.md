@@ -1,773 +1,729 @@
-# VoiceFlow – Roadmap & Entwicklungsdokumentation
+# VoiceFlow iOS - Roadmap & Product Specification
 
-> **Letzte Aktualisierung:** 2026-04-26 (Fix: Best-Effort-Delivery für Browser ohne AX-Cursor)
-> **Maintainer:** Eduard Munt
-> **Zweck:** Nachvollziehbare Entwicklungsgeschichte, aktueller Stand, offene Punkte
-
----
-
-## Projektübersicht
-
-VoiceFlow ist eine lokale macOS Menubar-App für Push-to-Talk Sprache-zu-Text.
-Keine Cloud, keine Subscription — alles läuft lokal auf Apple Silicon.
-
-**Hotkey:** `Fn + Shift` (halten zum Aufnehmen, loslassen zum Transkribieren)
-**Starten:** `python main.py`
-
-### Tech-Stack
-
-| Komponente          | Technologie                           |
-| ------------------- | ------------------------------------- |
-| Spracherkennung     | mlx-whisper (Apple Silicon optimiert) |
-| LLM Post-Processing | mlx-lm (Phi-4-mini, Qwen 2.5)         |
-| UI                  | rumps (macOS Menubar)                 |
-| Text-Injektion      | CGEventPost (Quartz)                  |
-| Accessibility       | ApplicationServices (AX API)          |
-| Hotkey-Erkennung    | CGEventSourceKeyState (Quartz)        |
+> **Last updated:** 2026-04-28
+> **Purpose:** iOS product specification for VoiceFlow as a keyboard-centered dictation and text-formatting app
 
 ---
 
-## Architektur
+## Product Goal
 
-```
-main.py
-  └─ ui/menubar_app.py          ← Zentrale Steuerung, Pipeline
-       ├─ core/hotkey_manager.py    ← Fn+Shift Polling (40ms)
-       ├─ core/audio_recorder.py   ← Mikrofon-Aufnahme
-       ├─ core/transcriber.py      ← mlx-whisper Wrapper
-       ├─ core/cursor_context.py   ← Cursor-Position via AX API
-       ├─ core/llm_post_processor.py ← LLM Korrektur (mlx-lm)
-       ├─ core/vocab_learner.py    ← Automatisches Vokabular-Lernen
-       ├─ core/text_injector.py    ← CGEventPost Text-Injektion
-       ├─ core/post_processor.py   ← Einfache Textnachbearbeitung
-       ├─ core/word_logger.py      ← Statistik
-       └─ settings/app_settings.py ← Persistente Einstellungen
+VoiceFlow iOS should let users dictate text while working in other iOS apps, improve the recognized raw transcript, and insert the final text into the currently selected text field.
+
+The clean iOS architecture is:
+
+```text
+VoiceFlow Keyboard Extension
+  + VoiceFlow Containing App
+  + Apple Speech / optional offline engine later
+  + LLM/rule-based postprocessing
+  + App Group store for result handoff
 ```
 
-### Transkriptions-Pipeline
-
-```
-Hotkey gedrückt
-  → get_context_before_cursor()   [AX API, vor Overlay]
-  → AudioRecorder.start()
-  → Overlay anzeigen
-
-Hotkey losgelassen
-  → AudioRecorder.stop()
-  → WhisperTranscriber.transcribe(audio, initial_prompt=vocabulary)
-  → apply_learned_corrections(text, vocab_cache)   [immer]
-  → LLMPostProcessor.process(text, capitalize, vocabulary)  [wenn aktiviert]
-  → VocabLearner.learn(original, corrected)  [im Hintergrund, wenn LLM Änderungen]
-  → should_capitalize(cursor_context) → Groß/Klein anpassen
-  → deliver_text(text, cursor_context, frontmost_bundle)
-```
+VoiceFlow does not replace Apple's system dictation. VoiceFlow is enabled as a custom keyboard and writes into the active text field through the official keyboard APIs.
 
 ---
 
-## Persistente Dateien
+## iOS Assumptions
 
-| Datei                           | Inhalt                                             |
-| ------------------------------- | -------------------------------------------------- |
-| `~/.voiceflow/settings.json`    | App-Einstellungen (Modell, Sprache, LLM an/aus, …) |
-| `~/.voiceflow/vocab_cache.json` | Gelernte Korrekturen `{"opener eye": "OpenAI", …}` |
-| `~/.voiceflow/voiceflow.log`    | Laufzeit-Log (stdout + stderr)                     |
-| `~/.voiceflow/word_log.json`    | Wort-Statistiken (heute / 7 Tage / gesamt)         |
+### What iOS Allows
 
----
+- A Custom Keyboard Extension can be enabled systemwide as a keyboard.
+- When VoiceFlow is the active keyboard, it can insert text into the currently selected text field using `UITextDocumentProxy.insertText(...)`.
+- The Keyboard Extension can read limited context around the cursor:
+  - `documentContextBeforeInput`
+  - `documentContextAfterInput`
+- The containing app can handle microphone recording, speech recognition, LLM formatting, history, vocabulary, and settings.
+- The containing app and Keyboard Extension can exchange data through App Groups.
 
-## Abgeschlossen
+### What iOS Does Not Allow
 
-### 2026-04-26 — Feature: Analytics-Dashboard + Tab-Navigation im Verlauf-Fenster
-
-**Was geändert:**
-
-Das Verlauf-Fenster hat jetzt zwei Tabs direkt in der Titelleiste (Pill-Style):
-
-- **Verlauf** — bestehende Transkriptions-Liste (unverändert)
-- **Analyse** — neues Analytics-Dashboard mit 3 Zeilen Cards
-
-**Dashboard-Inhalt (Analyse-Tab):**
-
-- **Zeile 1:** WPM-Card (Gauge-Arc + Heute/7 Tage/Tagesrekord-Vergleich) + Gesamte-Wörter-Card (große Zahl, Kontext-String, Monats-Badge +X%, Sub-Stats Heute/7 Tage/Monat)
-- **Zeile 2:** 30-Tage-Streak-Card mit GitHub-style Kalender-Heatmap (7 Wochentag-Zeilen × N Wochen-Spalten, 4 Intensitätsstufen Sky Blue, Hover-Highlight)
-- **Zeile 3:** 4 Mini-Cards — Ø Sitzungsdauer, Sitzungen/Monat, Genauigkeit (WER aus LLM-Korrekturen), Längster Text
-
-**Neues Feld in word_log.jsonl:** `"accuracy"` (0.0–1.0, SequenceMatcher-Ratio zwischen Whisper-Output und LLM-Korrektur) — wird beim nächsten Diktat mit aktivem LLM gefüllt.
-
-**Geänderte Dateien:**
-
-- `core/word_logger.py` — 9 neue statische Methoden (`compute_wpm_windows`, `compute_monthly_change`, `compute_words_this_month`, `compute_words_per_day`, `compute_longest_streak`, `compute_sessions_this_month`, `compute_avg_duration_s`, `compute_max_session_words`, `compute_accuracy`), `log()` akzeptiert jetzt `correction_ratio`
-- `ui/history_window.py` — Tab-Buttons, `_history_container`, `_analytics_scroll`, `_GaugeView`, `_HeatmapView`, alle Card-Builder-Funktionen, `_render_analytics()`
-- `ui/menubar_app.py` — `correction_ratio` (SequenceMatcher) wird an `word_logger.log()` übergeben
+- No global push-to-talk hotkey.
+- No systemwide simulation of keyboard input into arbitrary apps.
+- No registration as a replacement provider for Apple's system dictation service.
+- No interception of normal Apple dictation output before insertion.
+- No reliable microphone/speech workflow directly inside a Keyboard Extension.
+- No availability in every field: Secure Fields, Phone Pads, and apps that disable third-party keyboards can exclude VoiceFlow.
+- **No programmatic "Return to App":** iOS does not allow the app to force the user back to the previous application. The user must use the system "Back" breadcrumb or the App Switcher.
 
 ---
 
-### 2026-04-26 — Fix: Best-Effort-Delivery für Browser ohne AX-Cursor
+## Technical Refinements & Constraints
 
-**Problem:** Die frühere Aussage "Textfeld-Fokus in Chrome ist von außen nicht erkennbar" war zu absolut. Korrekt ist: Chrome/Browser/Electron liefern über AX häufig `None` bzw. `kAXErrorNoValue`, sodass AX allein nicht zuverlässig als Injection-Gate reicht. Der reine Bundle-ID-Fallback injizierte aber per TYPE auch dann, wenn kein Textfeld aktiv war, und konnte dabei still ins Leere laufen.
+### Open Access (Full Access) Requirement
+- **Deep Linking:** Opening the containing app from the keyboard via `openURL` typically requires the user to enable "Allow Full Access" in iOS Settings.
+- **App Group Latency:** While App Groups work without Full Access, some synchronization edge cases are smoother with it.
+- **Decision:** Phase 0 must confirm if the MVP will mandate "Full Access" or if a fallback (instructional UI) is preferred.
 
-**Lösung:**
+### App Group Storage Strategy
+- **Low Latency (`PendingInsert`, `KeyboardState`):** Use `UserDefaults(suiteName: "group.com.voiceflow")`. This is atomic and highly reliable for extension-to-app handoffs.
+- **High Volume (`DictationRecord`, `VocabularyEntry`):** Use `SwiftData` or a shared SQLite file.
+- **Group ID:** `group.com.voiceflow.shared` (to be configured in Entitlements).
 
-Die Entscheidung liegt jetzt zentral in `core/text_delivery.py`:
-
-- `cursor_context is not None` → direkte `inject_text()`-Pipeline; Clipboard nur bei technischem Injection-Fehler
-- Browser/Electron + `cursor_context is None` → Clipboard setzen + `trigger_paste()` (Cmd+V); Chrome's Blink-Renderer ignoriert Unicode-CGEvents für Web-`<input>`-Felder, aber Cmd+V geht durch Chrome's nativen Paste-Handler
-- Nicht-Browser + `cursor_context is None` → Clipboard-Fallback, keine Events
-
-`trigger_paste()` in `core/text_injector.py`: Socket → C-Launcher PASTE-Kommando, Fallback auf CGEvent Cmd+V (`kCGEventFlagMaskCommand` + kVK_ANSI_V=9).
-
-**Ergebnis:**
-
-- Chrome Web-Textfeld (cursor_context=None) → Clipboard + Cmd+V → Text erscheint; Clipboard enthält Text als Backup
-- Chrome URL-Bar (cursor_context='') → direkte TYPE-Injektion (AX funktioniert für Omnibox)
-- Chrome ohne aktives Textfeld → Cmd+V ohne Effekt; Text im Clipboard; Overlay zeigt Hinweis
-- Finder/Desktop/PDF → nur Clipboard-Fallback
-- Native Apps mit AX-Kontext → direkte TYPE-Injektion wie bisher
-
-**Geänderte Dateien:**
-
-- `core/text_delivery.py`
-- `core/text_injector.py`
-- `ui/menubar_app.py`
+### Audio Session Management
+- **Category:** `.playAndRecord` or `.record`.
+- **Options:** `.allowBluetooth`, `.duckOthers`, and `.interruptSpokenAudioAndMixWithOthers` to ensure the app doesn't abruptly kill the user's background music/podcasts unless necessary.
 
 ---
 
-### 2026-04-25 — Fix: Injection-Gate via AX + Browser-Whitelist
+## Microphone Button Below The Keyboard
 
-**Status:** Überholt durch den Best-Effort-Delivery-Fix vom 2026-04-26. Die Annahme, dass TYPE-Events ohne Textfeld harmlos ins Leere gehen, war für die UX nicht ausreichend; Browser-Fallback kopiert den Text jetzt zusätzlich ins Clipboard und zeigt einen expliziten Hinweis.
+The microphone button below the iOS keyboard belongs to Apple's system dictation. VoiceFlow cannot register itself there as an alternative provider.
 
-**Problem:**
+`UIInputViewController.hasDictationKey` does not mean that VoiceFlow can replace Apple's dictation button. It only controls whether a Custom Keyboard Extension presents its own dictation key in its UI, so iOS does not also show a confusing system dictation button.
 
-Nach Einführung des TYPE-Befehls wurde `inject_text()` immer aufgerufen — auch wenn kein Textfeld aktiv war. TYPE sendet Keyboard-Events an welches Element auch immer den Fokus hat und gibt immer "ok" zurück. Folge: Text wurde in zufällige Elemente (z.B. unsichtbare Felder in Chrome) geschrieben, oder Events gingen ins Leere — und der Clipboard-Fallback wurde nie ausgelöst.
+Consequence:
 
-**Damals eingeführter Fix (überholt):**
-
-Zweistufiger Entscheidungsbaum in `ui/menubar_app.py`:
-
-1. **AX bestätigt Textfeld** (`_cursor_context is not None`) → `inject_text()` — direktes Textfeld, TYPE funktioniert
-2. **AX scheitert, aber bekannte Browser/Electron-App** (`_frontmost_bundle in BROWSER_ELECTRON_BUNDLES`) → `inject_text()` — diese Apps blockieren AX, nehmen aber Keyboard-Events an
-3. **AX scheitert, unbekannte/native App** → `inject_text()` wird NICHT aufgerufen → Clipboard-Fallback + `show_copied()`
-
-In `core/cursor_context.py`:
-
-- Neue Konstante `BROWSER_ELECTRON_BUNDLES` (frozenset mit Bundle-IDs aller bekannten Chromium/Electron-Apps)
-- Neue Funktion `get_frontmost_bundle_id()` → Bundle-ID der vordersten App
-- `_begin_recording()` speichert Bundle-ID zeitgleich mit `_cursor_context` (vor dem Overlay, solange die User-App noch vorne ist)
-
-**Damaliges Ergebnis (überholt):**
-
-- ✓ Nativer App mit Textfeld: AX OK → inject
-- ✓ Chrome/VS Code/Notion mit Textfeld: AX scheitert, Bundle-ID erkannt → inject via TYPE
-- Überholt: Chrome/etc. ohne Textfeld braucht heute Sicherheitskopie ins Clipboard plus Overlay-Hinweis
-- ✓ Finder/PDF/Desktop: AX scheitert, Bundle-ID unbekannt → Clipboard-Fallback
-
-**Geänderte Dateien:**
-
-- `core/cursor_context.py`
-- `ui/menubar_app.py`
+- VoiceFlow shows its own microphone button inside the VoiceFlow keyboard.
+- This button starts the VoiceFlow dictation flow.
+- Recording happens in the containing app, not in the Keyboard Extension.
+- The final result is written to the App Group store.
+- After returning to the target app, the Keyboard Extension inserts the text using `UITextDocumentProxy.insertText(...)`.
 
 ---
 
-### 2026-04-25 — Feature: TYPE-Befehl im C-Launcher – Clipboard-freie Text-Injektion
+## Target Workflow
 
-**Problem:**
-
-Nach der Cursor-Injektion erschien der diktierte Text trotzdem in der Zwischenablage (z. B. sichtbar in Raycast/Maccy). Ursache: Die PASTE-Strategie setzt den Text für ~1 Sekunde ins NSPasteboard — Clipboard-Manager erfassen jede Änderung sofort.
-
-**Fix:**
-
-Neues Socket-Protokoll-Kommando `TYPE<utf8text>`:
-
-- **C-Launcher** (`build_app.py`): Neue Funktion `inject_type_utf8()` — konvertiert UTF-8-Bytes via CoreFoundation zu UniChar (UTF-16), sendet dann je Character zwei CGEvent-Keyboard-Events (Key Down + Key Up). Zeilenumbrüche werden als Return-Keycode 36 gesendet. Kein Clipboard-Zugriff.
-- **Socket-Server** (`build_app.py`): `CMD_BUF` auf 64 KB erhöht; Lese-Schleife bis EOF statt einmaligem `recv()` — notwendig für variable Textlängen. Neuer Branch `strncmp(buf, "TYPE", 4)` ruft `inject_type_utf8(buf+4, total-4)` auf.
-- **Python** (`core/text_injector.py`): Neue Funktion `_send_type_via_launcher(text)` sendet `b"TYPE" + text.encode("utf-8")` + `shutdown(SHUT_WR)`.
-- **Injektions-Reihenfolge** in `_via_launcher_socket()`:
-  1. `_send_type_via_launcher()` → kein Clipboard-Zugriff, kein Leak
-  2. `_send_paste_via_launcher()` → Fallback mit temporärem Clipboard (wie bisher)
-
-**Ergebnis:** Cursor-Injektion berührt die Zwischenablage nicht mehr. Clipboard-Manager sehen keinen VoiceFlow-Text.
-
-**Tests:** 2 neue Tests (`test_via_launcher_socket_type_succeeds_without_touching_clipboard`, `test_via_launcher_socket_falls_back_to_paste_when_type_fails`); alle 17 Tests grün.
-
-**Geänderte Dateien:**
-
-- `build_app.py`
-- `core/text_injector.py`
-- `tests/test_text_injector.py`
-
----
-
-### 2026-04-25 — Fix: Injection nicht von AX-Cursor-Erkennung abhängig machen
-
-**Eigentliche Ursache (aus Logs):**
-
-```
-[CursorContext] Chrome: kAXFocusedUIElement err=-25212 → Electron-Fallback
-[CursorContext] Chrome: AXManualAccessibility nicht setzbar (err=-25205)
-[CursorContext] Chrome: kein Textelement gefunden → None
+```text
+User is in Notes, Mail, Messages, Safari, etc.
+  -> User focuses a text field
+  -> User switches to the VoiceFlow keyboard
+  -> User taps the VoiceFlow microphone button
+  -> VoiceFlow containing app records audio
+  -> Apple Speech produces raw text
+  -> LLM/rules format the text
+  -> Result is saved to the App Group store
+  -> User returns to the target app
+  -> Keyboard Extension inserts the result into the active text field
 ```
 
-`get_context_before_cursor()` gibt `None` zurück für Google Chrome und teilweise Claude Desktop (Electron-Apps die AXManualAccessibility ablehnen). Der bisherige Code blockierte `inject_text()` komplett wenn `_cursor_context is None` — auch wenn ein aktives Textfeld vorhanden ist. Cmd+V via C-Launcher funktioniert aber auch ohne AX-Kontext, da die Injektion betriebssystemseitig an die fokussierte App gesendet wird.
+MVP variant:
 
-**Fix:**
+- After recording, the containing app briefly shows the result.
+- User can confirm or cancel.
+- Keyboard Extension then offers "Insert Last Dictation".
 
-- `ui/menubar_app.py`: `if self._cursor_context is not None:` Guard entfernt. `inject_text()` wird jetzt immer aufgerufen.
-- `_cursor_context` bleibt weiterhin für `should_capitalize()` (Großschreibung) zuständig — entkoppelt von der Injektionsentscheidung.
-- Clipboard-Fallback (`copy_to_clipboard` + `show_copied()`) tritt nur noch ein wenn **alle** Injektionsstrategien scheitern (Socket, Keyboard-Typing, CGEvent-Direct) — nicht mehr bei AX-Fehlern.
+Later variant:
 
-**Ergänzende Fixes in `core/text_injector.py`:**
-
-- `_via_launcher_socket` und `_via_cgevent_direct`: Clipboard wird jetzt **immer** restauriert, auch wenn der Paste-Schritt scheitert (vorher: kein Restore → Text verblieb im Clipboard).
-- `_restore_clipboard_text("")`: Neuer `else`-Zweig ruft `NSPasteboard.clearContents()` auf wenn Clipboard vorher leer war.
-
-**15 neue Tests in `tests/test_text_injector.py`** die alle Edge-Cases für Clipboard-Restore abdecken.
-
-**Geänderte Dateien:**
-
-- `ui/menubar_app.py`
-- `core/text_injector.py`
-- `tests/test_text_injector.py`
+- Auto-insert once the user returns to the target app / Keyboard Extension.
+- Optional quick confirmation inside the keyboard UI.
 
 ---
 
-### 2026-04-25 — Fix: Clipboard immer restaurieren nach Injektion
+## MVP Scope
 
-**Problem:**
+### Must Have
 
-Zwei Bugs in `core/text_injector.py` führten dazu, dass der VoiceFlow-Text nach einer Cursor-Injektion dauerhaft in der Zwischenablage verblieb:
+- VoiceFlow Keyboard Extension can insert text into supported text fields.
+- Containing app can request microphone and speech-recognition permissions.
+- Containing app can record a dictation and transcribe it with Apple Speech.
+- Containing app can normalize the raw text with rule-based postprocessing.
+- Containing app writes the final text to an App Group store.
+- Keyboard Extension reads the latest final text from the App Group store.
+- Keyboard Extension inserts the text using `UITextDocumentProxy.insertText(...)`.
+- Error states are shown visibly and are not silently ignored.
 
-1. `_via_launcher_socket`: Wenn `_send_paste_via_launcher()` `False` zurückgab (Socket nicht verfügbar), wurde `_restore_clipboard_text` nie aufgerufen — der neue Text blieb im Clipboard, obwohl nichts eingefügt wurde.
-2. `_restore_clipboard_text`: Wenn die Zwischenablage vor der Injektion **leer** war (`old_text == ""`), wurde die `if text:`-Bedingung nie erfüllt → `clearContents()` wurde nicht aufgerufen → VoiceFlow-Text blieb permanent im Clipboard.
+### Should Have
 
-**Fix:**
+- Simple history list in the containing app.
+- Manual editing of the final text before saving.
+- Context-aware capitalization using `documentContextBeforeInput`.
+- Clipboard fallback when insert is not possible.
+- Language setting for German / English / Auto, if Apple Speech supports the target setup well enough.
 
-- `_via_launcher_socket` und `_via_cgevent_direct`: Clipboard wird jetzt **immer** restauriert (via `_restore_clipboard_text`), unabhängig davon ob der Paste erfolgreich war.
-- `_restore_clipboard_text`: Neuer `else`-Zweig — wenn `old_text` leer war, wird `NSPasteboard.clearContents()` explizit aufgerufen.
+### Not In MVP
 
-**Geänderte Dateien:**
-
-- `core/text_injector.py`
-
----
-
-### 2026-04-25 — Fix: Clipboard-Fallback zuverlässig setzen
-
-**Was geändert:**
-
-Der Clipboard-Fallback setzt den Text jetzt auf dem AppKit-Main-Thread und verifiziert direkt, dass `NSPasteboard` wirklich den neuen Text enthält. Der automatische Paste-Pfad nutzt das Clipboard nur temporär und stellt danach den vorherigen Inhalt wieder her. Nur wenn keine Cursor-Injektion möglich ist, bleibt der erkannte Text dauerhaft in der Zwischenablage und das Copy-Overlay wird angezeigt.
-
-**Geänderte Dateien:**
-
-- `core/text_injector.py` — Main-Thread Clipboard-Set mit Rücklese-Verifikation; Paste-Pfade restaurieren den vorherigen Clipboard-Inhalt
-- `ui/menubar_app.py` — Copy-Overlay nur im echten Clipboard-Fallback anzeigen
-- `tests/test_text_injector.py` — erwartete Reihenfolge auf Socket-first-Strategie aktualisiert
-
-**Nachbesserung 2026-04-25:** Clipboard-Restore nach Cursor-Injektion von 0,2s auf 1,0s verlängert, damit Ziel-Apps mit verzögerter Pasteboard-Verarbeitung den temporär gesetzten VoiceFlow-Text noch lesen können.
+- Custom Whisper/Core ML ASR.
+- Fully local LLM.
+- Automatic insert without user confirmation.
+- Advanced analytics.
+- iCloud sync.
+- Full custom keyboard with all standard keys as a replacement for Apple's keyboard.
 
 ---
 
-### 2026-04-24 — Feature: Clipboard-Fallback bei fehlendem Cursor-Kontext
+## User Flows
 
-**Was geändert:**
+### Flow A - First Setup
 
-Wenn `get_context_before_cursor()` `None` zurückgibt (kein fokussiertes Textfeld erkannt), wird der transkribierte Text nicht injiziert, sondern in die Zwischenablage kopiert. Das Overlay zeigt dann „✓ Text in Zwischenablage kopiert" für 2,5 Sekunden an und blendet sich automatisch aus.
+```text
+User opens VoiceFlow app
+  -> App explains keyboard setup and privacy
+  -> User enables VoiceFlow Keyboard in iOS Settings
+  -> User grants microphone permission
+  -> User grants speech-recognition permission
+  -> App runs a test dictation
+  -> App shows: "Keyboard ready"
+```
 
-**Geänderte Dateien:**
+Acceptance criterion:
 
-- `ui/overlay.py` — neuer State `show_copied()` / `_set_copied()` (220px Pill, Blau-Glow, auto-hide 2.5s); `NSViewWidthSizable` auf Label für korrekte Breite bei Resize
-- `core/text_injector.py` — neue Funktion `copy_to_clipboard(text)`
-- `ui/menubar_app.py` — Pipeline-Weiche: `_cursor_context is None` → Clipboard + Overlay; sonst normaler Inject-Flow
+- User can understand why keyboard, microphone, and speech-recognition permissions are needed without technical jargon.
 
----
+### Flow B - Dictation From Another App
 
-### 2026-04-22 — Fix: Frühzeitiger RMS-Check (Whisper bei Stille überspringen)
+```text
+User focuses a text field in the target app
+  -> User switches to VoiceFlow Keyboard
+  -> User taps microphone button
+  -> Keyboard opens VoiceFlow app via deep link
+  -> App starts recording
+  -> User stops recording
+  -> App transcribes and formats
+  -> User confirms result
+  -> App saves result as pendingInsert
+  -> User returns to target app
+  -> VoiceFlow Keyboard shows pendingInsert
+  -> User taps Insert
+  -> Keyboard inserts text and marks pendingInsert as consumed
+```
 
-**Problem:** Hotkey halten ohne Sprechen → Nachverarbeitung dauerte lange (Whisper-Inference lief auch auf reinem Mikrofon-Rauschen).
+Acceptance criterion:
 
-**Ursache:** Die `MIN_INPUT_RMS`-Prüfung in `_filter_result` lief erst NACH dem vollständigen Whisper-Call — zu spät.
+- No recognized text is lost, even if the user switches between apps or the keyboard extension reloads.
 
-**Eigentliche Ursache (aus Log):** `rms_in` der stillen Aufnahmen (0.0016–0.0040) liegt oberhalb von `MIN_INPUT_RMS = 0.001` — Threshold greift nicht. Whisper halluziniert (`'イン'`, `'Thank you.'`), `_filter_result` leert den Text, `_retry_reason` sieht `is_empty` → **Retry** → Whisper läuft ein zweites Mal. Das verdoppelt die Latenz.
+### Flow C - Reinsert Latest Dictation
 
-**Fix 1:** `was_filtered: bool`-Flag in `TranscriptionResult` — wird in `_filter_result` auf `True` gesetzt wenn Text durch Halluzinations-/Blacklist-Filter geleert wird.
+```text
+User opens VoiceFlow Keyboard
+  -> Keyboard shows latest dictation
+  -> User taps Insert
+  -> Text is inserted into the active field
+```
 
-**Fix 2:** `_retry_reason` gibt `None` zurück wenn `was_filtered=True` oder `error` in `{no_speech_signal, empty_after_trim}` — kein Retry mehr bei erkannten Halluzinationen.
+Acceptance criterion:
 
-**Fix 3:** Früherkennung in `transcriber.transcribe()` vor `_transcribe_once`: wenn `0 < input_rms < MIN_INPUT_RMS`, sofort `error="no_speech_signal"` zurückgeben ohne Whisper aufzurufen.
+- The flow works without a new recording.
 
-**Fix 4 (Nachbesserung):** Non-Latin-Filter `len(alpha_chars) > 3` → `if alpha_chars:` — fängt jetzt auch einzelne japanische Zeichen wie `'ん'` (1 Alpha-Char), die vorher durchschlüpften.
+### Flow D - Unsupported Field
 
-**Fix 5 (Nachbesserung):** Neuer Filter in `_filter_result`: `avg_logprob < -1.1` bei ≤3 Wörtern → `was_filtered=True` — extrem niedriger logprob bei kurzer Ausgabe ist immer eine Halluzination, kein Retry sinnvoll.
+```text
+User is in Secure Field / Phone Pad / app without third-party keyboards
+  -> VoiceFlow Keyboard is unavailable or insert fails
+  -> Containing app can place result on clipboard
+  -> UI briefly explains the reason
+```
 
-**Geänderte Dateien:**
+Acceptance criterion:
 
-- `core/transcriber.py`
-
----
-
-### 2026-04-22 — Design: Glow-Effekt für Overlay
-
-**Was geändert:**
-
-- Zwei-Layer-Struktur in `_build()`: `_glow_view` (hinter Pill, `masksToBounds=False` → Shadow sichtbar) + `_pill_view` (clippt Kinder, transparent)
-- `_glow_view` trägt `_BG` Hintergrundfarbe + `CALayer` Shadow → farbiger Leuchteffekt außerhalb der Pill
-- `_pill_view` trägt Border, `masksToBounds=True`, alle Content-Subviews (Fill, Bar, Ring, Label)
-- `_set_glow(color, radius, opacity)` Helper für zustandsabhängige Glow-Farbe
-- Recording: Rose-Glow (radius=18, opacity=0.80)
-- Processing/Shrink-Ende: Blau-Glow (radius=12, opacity=0.55)
-- Downloading: Blau-Glow (radius=12, opacity=0.50)
-- Initializing: Blau-Glow (radius=10, opacity=0.40)
-- Ready: Blau-Glow (radius=14, opacity=0.65)
-
-**Geänderte Dateien:**
-
-- `ui/overlay.py`
-
----
-
-### 2026-04-21 — Design: History Window – Stats-Zahlen, Fenstergröße, Tests
-
-**Was geändert:**
-
-- `WIN_W` 860 → 1060, `WIN_H` 560 → 720 (Fenster deutlich größer, passt zum Screenshot)
-- `STATS_W` 190 → 210 (breitere Stats-Sidebar)
-- Stats-Zahlen: 26pt → 40pt Bold, Frame-Höhe 30 → 50, Zeichenbreite-Faktor 16 → 23
-- Stats-Card-Höhe: `min(sh * 0.55, 220)` → `min(sh * 0.60, 300)`
-- Min-Fenstergröße: 680×440 → 800×520
-- 25 neue Tests in `tests/test_history_window.py`: Layout-Konstanten, `_fmt`, `_date_header`, `_compute_stats`, `_group_by_date`, `_read_entries`
-
-**Geänderte Dateien:**
-
-- `ui/history_window.py`
-- `tests/test_history_window.py` (neu)
+- User gets a clear fallback and no technical error message.
 
 ---
 
-### 2026-04-22 — Fix: Mikrofon-Aufnahme in C-Launcher verlagert
+## State Model
 
-**Problem:** `rms_in=0.0000` — macOS blockierte den Mikrofon-Zugriff von python3.12 still, auch wenn VoiceFlow.app unter Mikrofon-Berechtigungen aktiviert war. Ursache: VoiceFlow.app (C-Binary) hat die Berechtigung, aber python (Child-Prozess via fork) greift auf das Mikrofon zu. macOS prüft den tatsächlich anfragenden Prozess, nicht den Eltern-Prozess.
+### DictationState
 
-**Lösung:** CoreAudio-Aufnahme (AudioQueue) in den C-Launcher verschoben — analog zur Text-Injektion. Neues Socket-Protokoll: `START_RECORDING` / `STOP_RECORDING` liefert raw int16 PCM zurück. `audio_recorder.py` nutzt Socket-Modus wenn VoiceFlow.app läuft, sounddevice als Fallback für Terminal-Start.
+```swift
+enum DictationState: String, Codable {
+    case idle
+    case requestingPermissions
+    case recording
+    case transcribing
+    case processing
+    case readyForReview
+    case pendingInsert
+    case inserted
+    case failed
+}
+```
 
-**Geänderte Dateien:**
+### KeyboardState
 
-- `build_app.py` — C-Launcher: AudioToolbox, rec_start/rec_stop, Socket-Protokoll erweitert
-- `core/audio_recorder.py` — Socket-Modus primär, sounddevice als Fallback
+```swift
+enum KeyboardState {
+    case noSharedAccess
+    case ready
+    case hasPendingInsert(DictationID)
+    case inserting
+    case insertUnavailable(reason: InsertUnavailableReason)
+}
+```
 
----
+### InsertUnavailableReason
 
-### 2026-04-22 — Fix: Text-Injektion via Socket zuerst (python braucht keine Accessibility)
-
-**Problem:** `venv/bin/python3.12` brauchte plötzlich Accessibility-Berechtigung, obwohl der C-Launcher (VoiceFlow.app) diese Berechtigung haben sollte.
-
-**Ursache:** `_via_keyboard_typing` (CGEventPost direkt aus python) war die erste Option in der Fallback-Kette. Da `CGEventPost` ohne Accessibility-Berechtigung keine Exception wirft, sondern still fehlschlägt, gab die Funktion immer `True` zurück — der Socket-Weg (C-Launcher mit VoiceFlow.app's Accessibility) wurde nie erreicht.
-
-**Fix:** Reihenfolge geändert: Socket zuerst → Keyboard-Typing als Fallback (Terminal-Start).
-
-**Geänderte Dateien:**
-
-- `core/text_injector.py`
-
----
-
-### 2026-04-22 — Fix: CGEventTap Callback – NSInternalInconsistencyException bei Fn-Events
-
-**Problem:** `Fn+Shift` wurde nicht erkannt. Log zeigte: `[Hotkey] Callback-Fehler: NSInternalInconsistencyException - Invalid parameter not satisfying: _type > 0 && _type <= kCGSLastEventType`
-
-**Ursache:** `NSEvent.eventWithCGEvent_(event)` wurde für alle Event-Typen aufgerufen. Bestimmte System-Events (u.a. Fn-Taste) haben einen internen CGS-Typ der außerhalb des gültigen NSEvent-Bereichs liegt → Exception. Vorher wurde bei Exception `flags = 0` gesetzt und `_fn_down = False` — damit wurde jede Fn-Betätigung als "losgelassen" interpretiert.
-
-**Fix:** `NSEvent.eventWithCGEvent_` nur noch innerhalb des `kCGEventFlagsChanged`-Zweigs aufrufen. Bei Exception den Tastenzustand unverändert lassen (`pass`) statt auf False zurückzusetzen.
-
-**Geänderte Dateien:**
-
-- `core/hotkey_manager.py`
-
----
-
-### 2026-04-21 — Fix: Hotkey CGEventTap (Fn+Shift funktioniert nicht mehr in .app-Bundle)
-
-**Problem:** Fn+Shift wurde nicht erkannt wenn die App über das VoiceFlow.app-Bundle gestartet wurde. Kein Overlay, keine Aufnahme. Im Debug-Log: `Fn=False Shift=False` dauerhaft.
-
-**Ursache:** `CGEventSourceKeyState` mit `kCGEventSourceStateHIDSystemState` benötigt auf macOS 15 (Sequoia) implizit die _Input Monitoring_ Berechtigung (`kTCCServiceListenEvent`). Beim Start aus dem Terminal erbte der Python-Prozess die Berechtigung von Terminal.app. Das VoiceFlow.app-Bundle hat diese Berechtigung nicht geerbt → API lieferte stillschweigend `False` für alle Keys.
-
-**Lösung:** `core/hotkey_manager.py` auf **CGEventTap** (`kCGEventTapOptionListenOnly`) umgeschrieben. CGEventTap:
-
-- Löst macOS Input Monitoring Permission-Dialog automatisch aus
-- Erkennt Fn+Shift über `kCGEventFlagsChanged` + `NSFnKeyMask` / `NSShiftKeyMask`
-- Fallback auf alten Polling-Ansatz wenn CGEventTap nicht erstellt werden kann
-
-**Geänderte Dateien:**
-
-- `core/hotkey_manager.py`
+```swift
+enum InsertUnavailableReason: String, Codable {
+    case noPendingText
+    case secureField
+    case unsupportedKeyboardType
+    case appDisallowsKeyboard
+    case sharedStoreUnavailable
+    case unknown
+}
+```
 
 ---
 
-### 2026-04-19 — Fix: Ellipsis-Normalisierung, Wort-Repetition-Filter, Non-Latin-Script-Filter
+## Target Architecture
 
-**Probleme (aus Log):**
+```text
+VoiceFlowApp
+  -> RecordingController
+       AVAudioSession / AVAudioEngine
+  -> SpeechEngine
+       AppleSpeechEngine first
+       WhisperEngine optional later
+  -> PostProcessor
+       rules + optional LLM
+  -> VocabularyStore
+       domain terms, correction pairs
+  -> DictationStore
+       latest text, history, status
+  -> SettingsStore
+       language, correction level, privacy mode
 
-1. `"No, I'm addicted to..."` → `"No, I'm addicted to. . ."` — drei einzelne Punkte mit Leerzeichen
-2. `"berechnung berechnung berechnung berechnung"` — Whisper-Wort-Repetition nicht gefiltert, LLM kapitalisierte sie sogar
-3. `"ステッシュッ"` mit logprob=-1.70 — japanische Zeichen wurden in eine DE/EN-App injiziert
+VoiceFlowKeyboardExtension
+  -> KeyboardViewController
+       microphone button, Insert, Retry, Cancel
+  -> TextProxyWriter
+       UITextDocumentProxy.insertText(...)
+  -> CursorContextReader
+       documentContextBeforeInput / AfterInput
+  -> SharedStoreClient
+       reads App Group store
+```
 
-**Ursachen:**
-
-1. `_SPACE_AFTER_PUNCT` Regex `([,.;:!?])` enthielt `.` — jeder Punkt in `...` wurde einzeln als Satzende behandelt und mit Leerzeichen versehen
-2. `_has_repetition_loop` prüft Ngrams erst ab `len(words) >= 8` und nur bei >4 Vorkommen — 4× dasselbe Wort in Folge (z.B. "berechnung x4") wurde nicht erkannt
-3. Kein Filter für Non-Latin Script — Whisper halluziniert bei schlechtem Audio gelegentlich Katakana/CJK, auch nach Retry
-
-**Fixes:**
-
-- `core/text_normalizer.py` — `_SPACE_AFTER_PUNCT`: `.` nur matchen wenn nicht von weiterem `.` umgeben: `(?<!\.)\.(?!\.)` — `...` bleibt unverändert, einzelner Satzpunkt funktioniert weiterhin
-- `core/transcriber.py` — `_has_repetition_loop`: neues Muster für konsekutive Einzelwort-Wiederholung: `\b(\w{4,})\b(?:\W+\1\b){2,}` — fängt 3+ Vorkommen desselben Worts hintereinander
-- `core/transcriber.py` — `_filter_result`: neuer Non-Latin-Script-Filter — wenn >50% der Buchstaben non-ASCII (ord ≥ 256) sind, wird der Text verworfen; deckt Katakana, CJK, etc. ab
-
-**Geänderte Dateien:**
-
-- `core/text_normalizer.py`
-- `core/transcriber.py`
-
----
-
-### 2026-04-15 — Fix: Modellwechsel Absturz + fehlendes Download-Fenster
-
-**Problem:** Beim Wechsel zwischen `large-turbo` und `large` (oder umgekehrt) stürzte die App ab und das Download-Fenster erschien nicht, wenn das Zielmodell noch nicht heruntergeladen war.
-
-**Ursache 1 — `is_model_cached` falsch-positiv:**
-HuggingFace Hub legt die Verzeichnisstruktur (inkl. leerer Snapshot-Hash-Unterordner) direkt beim Download-Start an — noch bevor die eigentlichen Modelldateien ankommen. `any(snapshots.iterdir())` lieferte daher `True` für ein leeres/unvollständiges Modell → `_download_model` wurde nie aufgerufen → kein Download-Fenster.
-
-**Ursache 2 — kein Recovery bei fehlgeschlagenem Warmup:**
-`transcriber.warmup()` fing Fehler zwar ab (try/except), gab aber kein Ergebnis zurück. `_warmup_current` wusste nicht ob der Load erfolgreich war und startete weder einen Retry noch einen Re-Download — die App blieb in einem inkonsistenten State hängen.
-
-**Ursache 3 — kein Guard gegen Doppel-Switch:**
-Schnelles Klicken während eines laufenden Downloads oder der Init-Phase konnte einen zweiten Switch auslösen.
-
-**Fixes:**
-
-- `core/model_manager.py` — `is_model_cached` prüft jetzt ob mindestens eine echte Gewichtsdatei (`.npz`, `.safetensors`, `.bin`, ≥ 1 MB) im Snapshot vorhanden ist, nicht nur ob das Verzeichnis existiert
-- `core/transcriber.py` — `warmup()` gibt `bool` zurück (`True` = erfolgreich, `False` = Fehler)
-- `ui/menubar_app.py` — `_warmup_current`: wenn `warmup()` False zurückgibt, wird `_download_model` erneut aufgerufen (Re-Download der unvollständigen Dateien)
-- `ui/menubar_app.py` — `_set_model`: Guard am Anfang — Modellwechsel wird ignoriert wenn State `downloading` oder `initializing` ist
-
-**Geänderte Dateien:**
-
-- `core/model_manager.py`
-- `core/transcriber.py`
-- `ui/menubar_app.py`
+Shared code should live in an extension-safe framework. Code that uses the microphone, speech recognition, or APIs unavailable to extensions stays exclusively in the containing app.
 
 ---
 
-### 2026-04-15 — Phonetische Substitution: Temperature-Retry + Prompt-Fix
+## Data Model
 
-**Problem:** "halluziniert" → "emulsioniert" (Whisper, logprob=-0.66), dann "emulsioniert" → "emulsiert" (LLM normalisierte non-standard Verbform — double-wrong).
+### DictationRecord
 
-**Fehler-Taxonomie aus Logs:**
+```swift
+struct DictationRecord: Codable, Identifiable {
+    let id: UUID
+    let createdAt: Date
+    var sourceLocale: String
+    var rawText: String
+    var processedText: String
+    var correctionLevel: CorrectionLevel
+    var durationMs: Int
+    var wordCount: Int
+    var accuracyRatio: Double?
+    var state: DictationState
+    var insertedAt: Date?
+}
+```
 
-- Klasse 1 Phonetische Substitution: seltene Verben werden durch häufigere phonetisch ähnliche ersetzt (logprob -0.45 bis -0.70) — confident falsch, overlapping mit korrekten Transkriptionen
-- Klasse 2 Englische Fachbegriffe: gelöst durch language=auto
-- Klasse 3 Sprachverwechslung: kurze Utterances mit auto können en/de verwechseln
-- Klasse 4 Strukturelles Rewriting: logprob -0.70 bis -0.80, jetzt von Retry erfasst
+### PendingInsert
 
-**Fixes:**
+```swift
+struct PendingInsert: Codable {
+    let dictationID: UUID
+    let text: String
+    let createdAt: Date
+    var consumedAt: Date?
+    var expiresAt: Date // Recommendation: 5-10 minute TTL for stale dictations
+}
+```
 
-- Retry-Threshold: -0.75 → -0.60 — fängt "emulsioniert"-Fall (-0.66) und ähnliche
-- Temperature-Retry: bei `low_logprob`-Retry im balanced-Profil wird `temperature=(0.0, 0.2)` verwendet statt nur 0.0 — weichere Wahrscheinlichkeitsverteilung gibt seltenen korrekten Wörtern eine Chance; `condition_on_previous_text=False` bleibt (verhindert Halluzinationen)
-- Minimal-Prompt: explizit verboten Verbstämme/Konjugationen zu verändern — verhindert LLM double-wrong
+### VocabularyEntry
 
-**Geänderte Dateien:**
+```swift
+struct VocabularyEntry: Codable, Identifiable {
+    let id: UUID
+    var heard: String
+    var correction: String
+    var isEnabled: Bool
+    var createdAt: Date
+    var lastUsedAt: Date?
+    var useCount: Int
+}
+```
 
-- `core/transcriber.py` — Threshold, `_build_decode_kwargs(temperature_retry)`, `_transcribe_once(temperature_retry)`
-- `core/prompts.py` — minimal level: Verbstamm-Verbot
-- `tests/test_transcriber.py` — 2 neue Tests, Grenzwert-Test auf -0.60 aktualisiert
+### Settings
 
----
-
-### 2026-04-15 — Stille-Halluzinationsfilter (Transcriber)
-
-**Problem:** Mikrofon 2-3s gehalten ohne Sprechen → Output `"Thank you."` (klassische Whisper-Halluzination auf Stille). `no_speech_prob=0.00` — Whisper war paradoxerweise zuversichtlich, also griff der bestehende no_speech-Filter nicht.
-
-**Ursachen:**
-
-- `input_rms=0.0025` — reines Mikrofon-Rauschen, kein Sprachsignal. Kein Filter prüfte die Eingangsenergie.
-- `_has_repetition_loop` im Transcriber prüfte nur Wort-Ngrams, nicht Zeichen-Muster → ギギギギ-Halluzinationen (einzelnes Zeichen, ein "Wort") wurden nicht erkannt.
-
-**Fixes:**
-
-- `MIN_INPUT_RMS = 0.006`: neuer Filter in `_filter_result` — wenn `input_rms < 0.006`, sofort verwerfen (kein Sprachsignal). Aus den Logs: Stille=0.0025, echte Sprache=0.028+
-- `_has_repetition_loop` um Zeichen-Regex erweitert: `(.{1,6})\1{8,}` — fängt ギギギ und LMLMLM
-- `"thank you"` / `"thank you."` zur Blacklist hinzugefügt (sekundäre Absicherung)
-
-**Geänderte Dateien:**
-
-- `core/transcriber.py`
-- `tests/test_transcriber.py` — 9 neue Tests
-
----
-
-### 2026-04-15 — Performance-Optimierung: level-aware num_predict + num_ctx (Ollama)
-
-**Ziel:** LLM-Latenz für 2-3-Satz-Diktat reduzieren ohne Qualitätsverlust.
-
-**Änderungen:**
-
-- `_num_predict(input_words, level)` — level-abhängiges Token-Limit statt pauschales `input_words * 3`:
-  - `minimal`: `max(40, input_words + 12)` — Korrektur-only, Output ≈ Input-Länge
-  - `soft`: `max(50, input_words * 1.3)`
-  - `medium`: `max(60, input_words * 1.8)`
-  - `high`: `max(80, input_words * 2)`
-  - Beispiel 25 Wörter/minimal: 90 Tokens → 37 Tokens (~59% weniger Generierungsarbeit)
-- `OLLAMA_NUM_CTX` 1024 → 768 — System-Prompt ~300 T + 2-3 Sätze ≈ 400 T — kleinerer KV-Cache
-- `_call_ollama` nimmt jetzt `level` entgegen und leitet es an `_num_predict` weiter
-
-**Geänderte Dateien:**
-
-- `core/ollama_processor.py`
-- `tests/test_ollama_processor.py` — Mock-Lambda auf `**kwargs` erweitert
+```swift
+struct VoiceFlowSettings: Codable {
+    var localeMode: LocaleMode
+    var correctionLevel: CorrectionLevel
+    var autoCopyFallback: Bool
+    var preferOnDeviceSpeech: Bool
+    var allowLLMProcessing: Bool
+    var privacyMode: PrivacyMode
+}
+```
 
 ---
 
-### 2026-04-15 — Performance-Fix & Repetitions-Loop-Schutz (Ollama Post-Processor)
+## Shared Store Contract
 
-**Problem 1:** Post-Processing dauerte zu lange.
-**Ursachen:**
+The App Group store is the central interface between the containing app and the Keyboard Extension. It must remain small, robust, and low-transaction.
 
-- Kein `num_ctx` gesetzt → Ollama lief mit Standard 2048–4096 Tokens KV-Cache, auch für 1–3-Satz-Diktat-Texte
-- Kein `num_predict` Limit → Modell konnte mehr Tokens generieren als nötig
-- `keep_alive: "10m"` → Modell wurde nach kurzer Pause aus dem RAM entladen
+### Writer
 
-**Problem 2:** Sporadischer Output wie `"Teile des Textes... LMLMLMLMLMLMLMLM..."`
-**Ursache:**
+- Containing app writes `PendingInsert`.
+- Containing app writes `DictationRecord`.
+- Containing app writes settings and vocabulary.
 
-- `temperature: 0` (greedy decoding) + **kein `repeat_penalty`** → klassischer Repetitions-Loop ohne Ausweg
-- `_has_repetition_loop()` fehlte in der LLM-Output-Validierung (war nur im Whisper-Transcriber)
+### Reader
 
-**Lösung:**
+- Keyboard Extension reads `PendingInsert`.
+- Keyboard Extension reads reduced settings.
+- Keyboard Extension reads favorites/snippets.
 
-- `OLLAMA_NUM_CTX = 512` → ausreichend für kurze Diktat-Korrekturen, ~3–4× schnellere Inferenz
-- `num_predict = max(60, input_words * 3)` → dynamisches Token-Limit pro Anfrage
-- `repeat_penalty: 1.15` + `repeat_last_n: 64` → bricht Repetitions-Loops bei greedy decoding
-- `keep_alive: "30m"` → Modell bleibt länger im RAM (von 10m erhöht)
-- `_has_repetition_loop()` in `llm_post_processor._validate_output` → fängt Loops bei allen Enhancement-Levels ab, inkl. Zeichenmuster-Regex für "LMLMLM..."-Typ
+### Rules
 
-**Geänderte Dateien:**
-
-- `core/ollama_processor.py` — neue Konstanten, `_call_ollama` und `warmup` aktualisiert
-- `core/llm_post_processor.py` — `_has_repetition_loop()` hinzugefügt, in `_validate_output` eingehängt
+- Keyboard Extension must not trigger long write operations.
+- `PendingInsert` remains available until insert succeeds or the user discards it.
+- After successful insert, the Keyboard Extension sets `consumedAt`.
+- Store access must be font-tolerant because extensions can be terminated at any time.
 
 ---
 
-## Abgeschlossen (Archiv)
+## Core Technologies
 
-### 2026-04-09 — Frontend-Redesign v2: Void Signal Aesthetic
-
-**Was geändert:** Vollständiges visuelles Redesign beider UI-Komponenten — neues Farbsystem, neue Waveform-Logik, neue Proportionen.
-
-**Design-Richtung:** Void Signal — near-black (`#0A0A0F`), Rose-Akzent (`#F2667A`) für Aufnahme/Interaktion, Sky Blue (`#66CCFF`) für Informations-/Fortschritts-Zustände, kühles Off-White statt warmes Off-White.
-
-**overlay.py:**
-
-- Neue Palette: `_BG` (near-black, kühler Blau-Shift), `_ROSE` für Waveform/Recording, `_BLUE` / `_BLUE_FILL` für Download/Init/Ready
-- Pill-Höhe: 38px → 34px, Radius: 19 → 17 (schlanker, präziser)
-- Waveform: 2 Wellen (amber) → 3 Harmonische in Rose — Grundwelle (1.6pt) + zweite Harmonische (38% Opazität, 0.8pt) + dritte Harmonische (14% Opazität, Gegenphase, 0.5pt)
-- Rahmen: reines Weiß 10% → Sky Blue 10% (thematisch stimmig)
-- Fill-Bar: Amber → Sky Blue
-- Text-Farbe: warmes Off-White `(0.95, 0.94, 0.90)` → kühles Off-White `(0.87, 0.90, 0.95)`
-- Ready-State: Amber → Sky Blue
-- Download-Text auf Fill: dunkelnavyblau statt dunkelbraun
-
-**history_window.py:**
-
-- Hintergrund: `(0.09, 0.09, 0.11)` → `(0.04, 0.04, 0.06)` — deutlich tiefer/dunkler
-- Sidebar-BG: `(0.07, 0.07, 0.09)` → `(0.03, 0.03, 0.05)`
-- Text: kühles Off-White `(0.87, 0.90, 0.95)` statt warmem
-- Stats-Zahlen: Amber → Sky Blue, Schrift von Bold 34pt → Semibold 32pt (raffinierter)
-- Icon-Sidebar: Amber aktiver Hintergrund → Blue Dim; aktive Icon-Tint: Amber → Sky Blue
-- Row-Press-Feedback: Amber-Ton → Rose-Ton (unterscheidet sich klar von Hover)
-- Key-Pills: dunklerer Hintergrund `(0.14, 0.15, 0.18)`, weißer Border 10%
-- Separator-Opazität: 6% → 5% (subtiler)
-
-**Geänderte Dateien:**
-
-- `ui/overlay.py`
-- `ui/history_window.py`
+| Area                       | Technology                                                 |
+| -------------------------- | ---------------------------------------------------------- |
+| App UI                     | SwiftUI                                                    |
+| Keyboard Extension         | `UIInputViewController`, UIKit                             |
+| Text insertion             | `UITextDocumentProxy.insertText(...)`                      |
+| Cursor context             | `documentContextBeforeInput`, `documentContextAfterInput`  |
+| Audio recording            | `AVAudioSession`, `AVAudioEngine`                          |
+| Speech recognition MVP     | `SFSpeechRecognizer`                                       |
+| On-device speech check     | `supportsOnDeviceRecognition`                              |
+| Postprocessing             | Rule pipeline + optional local LLM adapter                 |
+| Persistence                | SwiftData or SQLite                                        |
+| Extension communication    | App Groups, shared container, UserDefaults/file/SQLite     |
+| Shortcuts                  | App Intents                                                |
+| Later offline ASR          | Whisper/Core ML or whisper.cpp/Metal                       |
 
 ---
 
-### 2026-04-09 — Frontend-Redesign: Dark Studio Aesthetic
+## Speech Strategy
 
-**Was geändert:** Komplettes visuelles Redesign beider UI-Komponenten mit dem frontend-design Skill.
+Custom voice recognition is not required for the MVP. VoiceFlow should first use Apple's Speech framework, but not Apple's ready-made system dictation button.
 
-**Design-Richtung:** Refined Dark Studio — tiefes Anthrazit (`#17171c`), warmer Amber-Akzent (`#FF9E1A`), keine generischen macOS-Defaults (kein system blue, kein forced light mode).
+The distinction is central:
 
-**overlay.py:**
+- **Not possible:** Replace Apple's dictation button or intercept its output.
+- **Possible:** Start a VoiceFlow-owned recording and produce raw text through `SFSpeechRecognizer`.
 
-- Neue Farbpalette: `_BG` (dunkel-anthrazit, 94% opak) + `_AMBER` als Akzentfarbe statt generischem Blau
-- Doppelte Wellenform: Haupt-Welle in Amber + Echo-Welle halbtransparent versetzt
-- Subtiler Rahmen (0.5pt, 10% weiß) für Tiefenwirkung
-- "Modell bereit"-State zeigt Text in Amber statt weiß
-- Download-Fill in Amber; Label-Farbe wechselt je nach Fill-Fortschritt (dunkel auf hellem Hintergrund)
+### Decision
 
-**history_window.py:**
+Apple Speech is the first `SpeechEngine`. Whisper/Core ML remains a later alternative if Apple Speech is insufficient for quality, offline availability, mixed-language dictation, or privacy.
 
-- Vollständiges Dark Theme statt `NSAppearanceNameAqua` → `NSAppearanceNameDarkAqua`
-- Eigene Farbpalette (nicht mehr system accent color): warmer Weißton `(0.95, 0.94, 0.90)`, Amber für Zahlen
-- Stats-Sidebar: Caption uppercase+klein oben, große Zahl in Amber unten — mehr Impact
-- Icon-Sidebar: amber-getönter aktiver Hintergrund statt system accent
-- Key-Pills: dunkleres Grau mit feinem Rahmen (0.5pt)
-- Fenster-Titel: "VoiceFlow — Verlauf" statt nur "Verlauf"
+```swift
+protocol SpeechEngine {
+    func requestPermissions() async throws
+    func start(locale: Locale) async throws
+    func stop() async throws -> SpeechResult
+}
+```
 
-**Geänderte Dateien:**
-
-- `ui/overlay.py`
-- `ui/history_window.py`
-
----
-
-### 2026-04-07 — Fix: Großschreibung nach `.!?` mit Unicode-Whitespace im Cursor-Context
-
-**Problem:** Wenn die App nach dem Satzzeichen einen Unicode-Whitespace-Charakter hinterließ (z.B. U+00A0 Non-Breaking Space), gab `should_capitalize()` fälschlicherweise `False` zurück — das Enforcement-Block lowercased daraufhin den ersten Buchstaben aktiv.
-
-**Ursache:** `context.rstrip(" \t")` entfernte nur ASCII-Space und Tab, nicht alle Unicode-Whitespace-Zeichen.
-
-**Lösung:** `context.rstrip(" \t")` → `context.rstrip()` — Python's `str.rstrip()` ohne Argument verwendet `str.isspace()` und entfernt alle Unicode-Whitespace-Zeichen.
-
-**Geänderte Dateien:**
-
-- `core/cursor_context.py` — Zeile 342: `rstrip(" \t")` → `rstrip()`
+| Option                         | Benefit                                                     | Drawback                                                              | Decision                              |
+| ------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------- |
+| Apple Speech Framework         | Fast MVP, native API, low ML complexity                     | Own recording required, system behavior not fully controllable         | MVP default                           |
+| Apple Speech On-Device         | Potentially local without a custom model                    | Availability depends on language/device/iOS version                    | Validate in Phase 0                   |
+| Whisper/Core ML                | Full control, consistent offline story                      | Model size, battery, memory, latency, conversion work                  | Later, only with proven need          |
 
 ---
 
-### 2026-04-06 — Halluzinations-Filter: Nur-Satzzeichen-Output
+## Postprocessing Strategy
 
-**Problem:** Whisper erzeugte bei 3-4 Sekunden Stille/Hintergrundgeräuschen das Zeichen `"!"` — die `no_speech_prob` lag dabei knapp unter dem 0.5-Schwellwert, sodass der bestehende Filter nicht griff.
+VoiceFlow differentiates primarily through text quality after recognition, not through speech recognition itself.
 
-**Ursache:** Whisper halluziniert Satzzeichen wie `"!"`, `"..."`, `"…"` wenn es Geräusche erkennt, aber keine eigentliche Sprache transkribieren kann.
+### Responsibilities
 
-**Lösung:** Neuer Filter am Ende von `transcribe()`: wenn der Text nach Entfernen aller Nicht-Wort-Zeichen leer ist (also kein einziger Buchstabe/Ziffer enthalten), wird `""` zurückgegeben.
+- Normalize punctuation and whitespace.
+- Capitalize sentence starts.
+- Correct domain terms and proper nouns.
+- Handle mixed German/English dictation better.
+- Preserve spoken style; do not freely rewrite content.
+- Optionally offer formatting profiles:
+  - minimal: obvious mistakes only
+  - soft: punctuation, capitalization, light grammar
+  - medium: improve readability while preserving content
 
-**Geänderte Dateien:**
+### Guardrails
 
-- `core/transcriber.py` — Regex-Prüfung `re.sub(r'[^\w]', '', text)` nach der Blacklist
+- Maximum word-count deviation.
+- Length limit.
+- Similarity ratio between raw text and correction.
+- Repetition filter.
+- Fallback to raw text when correction is uncertain.
 
----
+### Vocabulary
 
-### 2026-04-06 — LLM Post-Processing v2: erweiterter Korrektur-Scope
+Apple Speech cannot be controlled with a free-form `initial_prompt` like Whisper. Vocabulary is therefore applied after the speech result:
 
-**Problem:** Bisheriger System-Prompt korrigierte ausschließlich phonetische Fehler bei Eigennamen — Satzzeichen, Groß-/Kleinschreibung und Grammatik wurden nicht angefasst.
-
-**Lösung:**
-
-- `_SYSTEM_PROMPT_BASE` komplett neu: jetzt explizit erlaubt: Satzzeichen setzen, deutsche Nomen großschreiben, Eigennamen großschreiben, phonetische Korrekturen
-- Explizit verboten: Wörter entfernen/hinzufügen, Satzbau ändern — der gesprochene Stil bleibt erhalten
-- Few-Shot-Beispiele für alle erlaubten Korrekturen ergänzt (Komma, Punkt, Fragezeichen, Nomen-Großschreibung)
-- `_validate_output()` überarbeitet: prüft jetzt **Wortanzahl** (max. ±1 Wort Abweichung) statt reiner Zeichenlänge — fängt Halluzinationen zuverlässiger ab ohne legitime Korrekturen zu blockieren
-- Zeichen-Ratio-Schwellwert von 0.55 → 0.60 auf bereinigtem Text (ohne Satzzeichen)
-
-**Geänderte Dateien:**
-
-- `core/llm_post_processor.py`
-
----
-
-### 2026-04-06 — Cursor-Kontext für Electron-Apps (AXManualAccessibility)
-
-**Problem:** Claude Code, VS Code und andere Electron-Apps blockierten `kAXFocusedUIElementAttribute` (`err=-25212`). Cursor-Kontext war für diese Apps nicht lesbar → Großschreibung wurde falsch gehandhabt.
-
-**Untersuchung:**
-
-- AX Tree Traversal zeigte: alle Elemente mit `val=''`, `n_chars=0` → Chromium exponiert AX-Baum nicht standardmäßig
-- Entdeckung: `AXManualAccessibility`-Attribut (Chromium-intern) war `False`
-- `AXEnhancedUserInterface` war bereits `True` (reicht allein nicht)
-
-**Lösung:** `AXManualAccessibility=True` per `AXUIElementSetAttributeValue` setzen → Chromium aktiviert vollständigen AX-Baum inkl. `kAXValue` und `kAXSelectedTextRange`
-
-**Geänderte Dateien:**
-
-- `core/cursor_context.py` — 3-stufige Strategie: Direct → Electron (AXManualAccessibility) → Tree-Traversal; Clipboard-Trick komplett entfernt
-- `core/llm_post_processor.py` — `capitalize: Optional[bool]` statt `bool`; `None` = "Großschreibung nicht anfassen"
-- `ui/menubar_app.py` — `capitalize` direkt weitergeben (kein `True`-Fallback mehr)
-
-**Ergebnis:** Cursor-Kontext funktioniert nun für native Apps UND Electron-Apps ohne Clipboard, ohne Keyboard-Simulation, ohne visuellen Effekt. PID-Caching verhindert wiederholtes Setzen.
+```text
+Speech raw text
+  -> apply known correction pairs
+  -> format with LLM/rules
+  -> learn new correction pairs
+```
 
 ---
 
-### 2026-04-06 — Automatisches Vokabular-Lernen (VocabLearner)
+## Insert Strategy
 
-**Problem:** Whisper machte wiederholt dieselben Fehler bei Eigennamen/Tech-Begriffen (z.B. "opener eye" statt "OpenAI"). Manuelle Korrekturen waren unpraktisch.
+The only primary insert path is `UITextDocumentProxy.insertText(...)`.
 
-**Lösung:** Automatischer Lernkreislauf:
+### Before Insert
 
-1. LLM korrigiert Whisper-Output
-2. `VocabLearner` vergleicht Original vs. Korrektur via `difflib.SequenceMatcher`
-3. Unterschiede werden in `vocab_cache.json` gespeichert
-4. Nächste Whisper-Aufnahme bekommt gelernte Begriffe als `initial_prompt`
-5. Bei deaktiviertem LLM: `apply_learned_corrections()` wendet Cache direkt an
+- Read `documentContextBeforeInput`.
+- Detect sentence start.
+- Add a leading space depending on context if no whitespace is present.
+- Avoid duplicate punctuation if the text already ends with punctuation.
 
-**Schutzregel:** Nur CamelCase/Abkürzungen/alphanumerische Begriffe werden gelernt (`_looks_like_proper_term`), verhindert Cache-Poisoning durch LLM-Halluzinationen.
+### After Insert
 
-**Geänderte/neue Dateien:**
+- Set `PendingInsert.consumedAt`.
+- Set `DictationRecord.insertedAt`.
+- Set keyboard UI to "Inserted".
 
-- `core/vocab_learner.py` — NEU: VocabLearner Klasse, extract_corrections, apply_learned_corrections
-- `core/transcriber.py` — `vocabulary` Parameter, `build_initial_prompt()`, `update_vocabulary()`
-- `ui/menubar_app.py` — VocabLearner integriert, `_learn_and_update_vocab()` Methode
+### Fallback
 
----
+If the keyboard is unavailable or insert appears impossible:
 
-### 2026-04-06 — LLM Post-Processing verbessert
-
-**Problem:** LLM halluzinierte Antworten statt zu korrigieren ("Kaptos ist korrekt großgeschrieben. Danke."). Kein Sicherheitsnetz gegen fehlerhafte Outputs.
-
-**Lösung:**
-
-- `_SYSTEM_PROMPT_BASE` mit Few-Shot-Beispielen ersetzt (zeigt exakt was erlaubt/verboten ist)
-- `_validate_output()` als Sicherheitsnetz: `SequenceMatcher`-Ratio < 0.55 oder Länge > 1.3× → Fallback auf Original
-- `capitalize: Optional[bool]` — drei Zustände: Satzanfang / mid-sentence / unbekannt
-
-**Geänderte Dateien:**
-
-- `core/llm_post_processor.py`
+- Copy text to `UIPasteboard`.
+- Briefly explain why clipboard was used.
+- Never discard text silently.
 
 ---
 
-### 2026-04-06 — LLM standardmäßig aktiviert
+## Permissions And Privacy
 
-**Änderung:** `llm_post_processing: bool = True` (war `False`)
+### Required Permissions
 
-**Geänderte Dateien:**
+- Microphone: for recording in the containing app.
+- Speech Recognition: for `SFSpeechRecognizer`.
+- Optional Keyboard Open Access: only if strictly required for App Group access, network access, or an expanded shared store.
 
-- `settings/app_settings.py`
+### Privacy Rules
 
----
-
-## Aktueller Stand (2026-04-06)
-
-- ✅ Push-to-Talk mit `Fn + Shift`
-- ✅ Whisper-Transkription (lokal, Apple Silicon)
-- ✅ LLM-Korrektur (Phi-4-mini / Qwen 2.5, lokal)
-- ✅ Automatisches Vokabular-Lernen
-- ✅ Cursor-Kontext für native Apps UND Electron-Apps
-- ✅ Korrekte Groß/Kleinschreibung je nach Cursor-Position
-- ✅ Text-Injektion via CGEventPost
-- ✅ Menubar-UI mit Statistik, Modell-/Sprachauswahl
-- ✅ Wort-Statistiken (heute / 7 Tage / gesamt)
+- Do not store audio in the MVP except for explicit debugging.
+- Raw text and final text remain local unless an external LLM mode is enabled.
+- If an external LLM is used, the mode must be clearly visible and disableable.
+- Keyboard Extension should only read the data needed for insert/favorites.
+- Secure Fields are not bypassed.
 
 ---
 
-## Geplant / Offen
+## Implementation Phases
 
-_(Hier neue Ideen und Issues eintragen)_
+### Phase 0 - Technical Spike
 
-- [ ] Cursor-Kontext für weitere Electron-Apps validieren (VS Code, Notion, Chrome)
-- [ ] Satzzeichen-Erkennung verbessern (Komma per Sprache einfügen)
-- [ ] Mehrsprachige Dokumente besser unterstützen (DE/EN Mix)
-- [ ] Vocab-Cache UI: anzeigen, löschen einzelner Einträge aus der Menubar
-- [ ] Performance: Whisper-Ladezeit beim ersten Start reduzieren
+Goal: Validate iOS limits early.
+
+- **Configure App Group:** Set up `group.com.voiceflow.shared` entitlements.
+- **Shared Data Spike:** Implement a `SharedUserDefaults` wrapper and test cross-process value updates.
+- **Open Access Test:** Verify if `NSExtensionContext().open(url)` works without Full Access.
+- **Insert Spike:** Insert test text through `UITextDocumentProxy.insertText(...)`.
+- **Context Spike:** Read context before/after cursor to handle auto-capitalization/spacing.
+- **Audio Spike:** Test `AVAudioSession` interruption behavior.
+- **Speech Spike:** Basic `SFSpeechRecognizer` loop in the app.
+- **Return Trip Spike:** Document the UX of returning to the target app via breadcrumb/switcher.
+
+Acceptance criteria:
+
+- VoiceFlow Keyboard can insert test text in Notes, Mail, Messages, and Safari text fields.
+- Containing app can record and transcribe dictations.
+- Keyboard Extension can insert the latest dictation from the App Group store.
+- Latency for 1-3 sentences is acceptable.
+- It is clear whether `RequestsOpenAccess` is needed for the planned store access.
+
+### Phase 1 - Keyboard MVP
+
+Goal: Complete dictation loop from a running target app.
+
+- **Keyboard UI Layout:**
+  - **Compact Mode:** Default state. Large Mic button, "Next Keyboard" icon.
+  - **Pending Mode:** Shown when `PendingInsert` is active. Preview snippet + "Insert" + "Discard".
+  - **Processing Mode:** Visual indicator that app is transcribing.
+- Deep link / open-app flow from keyboard to containing app.
+- Recording and transcription in the containing app.
+- **Return Trip UX:** Add a "Switch back to [App]" button/instruction in the App after recording is finished.
+- Rule-based postprocessing (happens in App, never in Extension).
+- Result handoff via App Group.
+- Manual insert through Keyboard Extension.
+- Fallback: copy result to clipboard if keyboard insert is unavailable.
+- Minimal history with latest dictation.
+- Setup screen with keyboard activation instructions.
+
+Acceptance criterion:
+
+- User can focus a text field in another app, switch to VoiceFlow Keyboard, dictate, format the result, and insert the text into that exact field.
+
+### Phase 2 - LLM Formatting And Vocabulary
+
+Goal: Make VoiceFlow text quality visibly better than raw dictation output.
+
+- `PostProcessor` with correction levels.
+- LLM adapter as an exchangeable service.
+- Guardrails against hallucinations.
+- Vocabulary learning from raw text vs. corrected text.
+- Vocabulary UI in the containing app:
+  - show
+  - edit
+  - delete
+  - disable
+- Store accuracy ratio per dictation.
+
+Acceptance criterion:
+
+- Recurring domain terms are reliably corrected after the speech result.
+- LLM corrections must not freely add content or rewrite meaning.
+
+### Phase 3 - History, Analytics, Reuse
+
+Goal: Make dictations searchable and reusable.
+
+- History with search.
+- Insert latest dictation directly from keyboard.
+- Favorites/snippets in keyboard.
+- Analytics:
+  - words today
+  - words over 7 days
+  - total words
+  - WPM
+  - streak
+  - longest text
+  - average session duration
+- App Shortcuts:
+  - start new dictation
+  - copy latest dictation
+  - share latest dictation
+
+Acceptance criterion:
+
+- User can find old dictations, insert them again, and understand usage history.
+
+### Phase 4 - Keyboard Robustness And System Limits
+
+Goal: Handle iOS edge cases cleanly.
+
+- Detect and explain Secure Fields.
+- Detect and explain Phone Pads.
+- Handle apps that disable third-party keyboards.
+- Cover unsupported text fields with clipboard fallback.
+- Optimize keyboard UI for small displays and landscape.
+- Harden App Group synchronization.
+- Show clear error states:
+  - missing permission
+  - speech unavailable
+  - no latest dictation
+  - insert unavailable
+- Improve insert context:
+  - leading space
+  - sentence start
+  - paragraph start
+  - selection/replacement where `UITextDocumentProxy` allows it
+
+Acceptance criterion:
+
+- The app does not fail silently in iOS edge cases and offers a clear fallback.
+
+### Phase 5 - Optional Offline ASR
+
+Goal: Build custom speech recognition only if need is proven.
+
+- Evaluate Whisper/Core ML or whisper.cpp/Metal.
+- Test tiny/base/small model sizes.
+- Evaluate batch vs. streaming.
+- Measure battery, memory, thermal load, and latency.
+- Compare quality against Apple Speech.
+- Define "fully local" privacy mode.
+
+Acceptance criterion:
+
+- Custom ASR is integrated only if it provides a clear advantage over Apple Speech.
+
+### Phase 6 - Privacy, Export, Release Readiness
+
+Goal: App Store-ready and trustworthy product line.
+
+- Clear display of active engine:
+  - Apple Speech
+  - Apple On-Device Speech
+  - local Whisper engine
+  - LLM local/on/off
+- Permission copy for microphone and Speech Recognition.
+- Data deletion for history and vocabulary.
+- Export/backup for history and vocabulary.
+- Privacy text for Keyboard Extension and Open Access.
+- Performance budget:
+  - app launch
+  - recording start
+  - transcription latency
+  - memory
+  - battery
+
+Acceptance criterion:
+
+- User understands which data is processed where.
+- The app has a stable permission and privacy story for App Review.
 
 ---
 
-## Bekannte Einschränkungen
+## Recommended Sequence
 
-| Problem                                          | Ursache                           | Workaround                                |
-| ------------------------------------------------ | --------------------------------- | ----------------------------------------- |
-| Electron-Apps ohne `AXManualAccessibility`       | App muss Chromium-based sein      | Strategie 3 (Tree-Traversal) als Fallback |
-| LLM erste Aktivierung langsam                    | Modell muss in RAM geladen werden | Warmup beim App-Start                     |
-| Whisper bei kurzen Aufnahmen (<1s) unzuverlässig | Zu wenig Audio-Kontext            | Mindestens 1-2 Sekunden sprechen          |
+1. Phase 0: Keyboard and Apple Speech spike
+2. Phase 1: Keyboard MVP with insert into the running app
+3. Phase 2: LLM formatting and vocabulary
+4. Phase 3: History, analytics, reuse
+5. Phase 4: Keyboard robustness and iOS edge cases
+6. Phase 5: Offline ASR only with proven need
+7. Phase 6: Privacy, export, release readiness
+
+---
+
+## Open Decisions
+
+- How exactly does the user return to the target app after recording?
+- Should Phase 1 attempt auto-insert or require explicit manual "Insert"?
+- Does the Keyboard Extension need `RequestsOpenAccess`?
+- Which App Group store is most robust: SQLite, file, or UserDefaults?
+- Is the MVP LLM local, remote, or initially only an interface?
+- What minimum iOS version should be required?
+- Which launch languages are mandatory: German, English, mixed German/English?
+- Should audio be temporarily storable for debugging, or strictly never persisted?
+- How large may keyboard history be inside the extension?
+- Should the keyboard show only VoiceFlow functions or also provide basic keys?
+
+---
+
+## Test Plan
+
+### Phase 0 Tests
+
+- Insert in Apple Notes.
+- Insert in Mail.
+- Insert in Messages.
+- Insert in Safari text field.
+- Behavior in Secure Field.
+- Behavior in Phone Pad.
+- Behavior after Extension restart.
+- Behavior without App Group access.
+- Apple Speech with German.
+- Apple Speech with English.
+- Apple Speech with mixed German/English.
+
+### MVP Acceptance Tests
+
+- Start dictation from target app.
+- Cancel recording.
+- Confirm recording.
+- Edit raw text.
+- Insert final text.
+- Reinsert latest dictation.
+- Use clipboard fallback.
+- Deny permission and grant later.
+- Simulate speech unavailable.
+- Simulate corrupted/empty store.
+
+---
+
+## Known Risks
+
+| Risk                                         | Cause                                          | Mitigation                                           |
+| -------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------- |
+| User loses context while switching apps      | Recording runs in containing app               | Store result in App Group, insert after return       |
+| Keyboard unavailable in some apps            | App blocks third-party keyboards               | Clipboard fallback and clear UI                      |
+| No insert in Secure Fields                   | iOS replaces custom keyboard with system keyboard | Communicate clearly, do not force workaround       |
+| Apple Speech unavailable offline             | Language/device/iOS-version dependency         | Allow online mode or evaluate Whisper later          |
+| LLM hallucinates formatting                  | Generative model                               | Guardrails and fallback to raw text                  |
+| Open Access discourages users                | Keyboard privacy sensitivity                   | Minimal data, clear privacy explanation              |
