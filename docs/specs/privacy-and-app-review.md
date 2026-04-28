@@ -1,7 +1,7 @@
 # Spec: Privacy & App Review
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** Not started (narrative drafted in Phase 0)
+> **Implementation status:** In progress (`RequestsOpenAccess` enabled; narrative drafted later in Phase 0)
 > **Last updated:** 2026-04-28
 > **Owners:** product + iOS
 

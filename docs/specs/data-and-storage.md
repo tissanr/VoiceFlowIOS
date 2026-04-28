@@ -1,7 +1,7 @@
 # Spec: Data & Storage
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** Not started (Phase 0 pending)
+> **Implementation status:** In progress (App Group entitlements wired; shared models and store pending)
 > **Last updated:** 2026-04-28
 > **Owners:** iOS
 

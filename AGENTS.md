@@ -100,10 +100,13 @@ For deeper design detail see [`docs/specs/architecture.md`](docs/specs/architect
 
 The Xcode project **is scaffolded** at [`VoiceFlow/VoiceFlow.xcodeproj`](VoiceFlow/VoiceFlow.xcodeproj) with all four targets defined. Source files are stubs (default Xcode templates).
 
-What is **not yet** wired up (Phase 0 prerequisites — see [`ROADMAP.md`](ROADMAP.md) → Phase 0):
+What is **already wired up** from Phase 0 scaffold hardening:
 
-- App Group entitlements (`.entitlements` files for both targets).
-- `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist) (currently `false`).
+- App Group entitlements (`.entitlements` files for both targets) using `group.com.voiceflow.shared`.
+- `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist).
+
+What is **not yet** wired up (remaining Phase 0 prerequisites — see [`ROADMAP.md`](ROADMAP.md) → Phase 0):
+
 - Shared models (`DictationRecord`, `PendingInsert`, `VocabularyEntry`, `VoiceFlowSettings`).
 - `SharedStoreClient` with the generation-counter concurrency protocol.
 - `SpeechEngine` protocol and `AppleSpeechEngine`.
@@ -167,8 +170,8 @@ When making technical decisions, respect these iOS constraints:
 ## Phase-0 prerequisites (the immediate work, in order)
 
 1. Resolve any remaining doc inconsistencies introduced by edits.
-2. Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]`.
-3. Set `RequestsOpenAccess = true` in the keyboard `Info.plist`.
+2. Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]`. **Done.**
+3. Set `RequestsOpenAccess = true` in the keyboard `Info.plist`. **Done.**
 4. Choose the deployment target after the min-iOS investigation; update the project settings.
 5. Stand up the shared framework / Swift package with the model types listed in [`docs/specs/data-and-storage.md`](docs/specs/data-and-storage.md).
 6. Implement `SharedStoreClient` honoring the generation-counter protocol.
