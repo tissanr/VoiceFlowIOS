@@ -1,7 +1,7 @@
 # Spec: Data & Storage
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** In progress (App Group entitlements wired; shared models and store pending)
+> **Implementation status:** In progress (App Group entitlements and shared model package wired; `SharedStoreClient` pending)
 > **Last updated:** 2026-04-28
 > **Owners:** iOS
 
@@ -26,12 +26,16 @@ The App Group ID must match in both targets' `.entitlements`, in `SharedStoreCli
 | Data | Storage | Reason |
 | --- | --- | --- |
 | `PendingInsert`, `KeyboardState`, generation counter | `UserDefaults(suiteName: "group.com.voiceflow.shared")` | Atomic per-key, suitable for extension/app handoffs. |
-| `DictationRecord` (history) | SwiftData *or* shared SQLite in the App Group container | Higher volume; choice deferred to Phase 0 min-iOS investigation. |
-| `VocabularyEntry` | Same store as `DictationRecord` | Indexed lookup needed for postprocessing. |
+| `DictationRecord` (history) | SwiftData in the App Group container | Higher volume than `PendingInsert`; selected by the Phase 0 min-iOS investigation. |
+| `VocabularyEntry` | SwiftData in the App Group container | Indexed lookup needed for postprocessing. |
 | `VoiceFlowSettings` | UserDefaults (subset readable from extension) | Small, hot, atomic. |
 | Diagnostic ring buffer | Shared file in the App Group container | Local-only, no network telemetry. |
 
 The Keyboard Extension never opens the heavy store at launch; it only opens UserDefaults and lazy-loads the items it needs (last 5 history entries, vocabulary subset). See [performance-and-memory.md](performance-and-memory.md).
+
+The SwiftData decision is documented in [../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md). If the App Group store contention spike shows SwiftData is unreliable for app/extension access patterns, switch history and vocabulary to shared SQLite before Phase 1.
+
+The extension-safe model definitions live in the local Swift package at [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/VoiceFlowShared).
 
 ---
 

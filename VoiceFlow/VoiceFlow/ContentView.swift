@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+import VoiceFlowShared
+
+private let voiceFlowSharedLinkCheck = VoiceFlowSettings.defaults
 
 struct ContentView: View {
     var body: some View {
@@ -16,6 +19,7 @@ struct ContentView: View {
             Text("Hello, world!")
         }
         .padding()
+        .accessibilityIdentifier(VoiceFlowConstants.appGroupIdentifier)
     }
 }
 

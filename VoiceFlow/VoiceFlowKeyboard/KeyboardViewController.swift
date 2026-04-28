@@ -6,10 +6,12 @@
 //
 
 import UIKit
+import VoiceFlowShared
 
 class KeyboardViewController: UIInputViewController {
 
     @IBOutlet var nextKeyboardButton: UIButton!
+    private let defaultSettings = VoiceFlowSettings.defaults
     
     override func updateViewConstraints() {
         super.updateViewConstraints()
@@ -22,6 +24,7 @@ class KeyboardViewController: UIInputViewController {
         
         // Perform custom UI setup here
         self.nextKeyboardButton = UIButton(type: .system)
+        _ = defaultSettings
         
         self.nextKeyboardButton.setTitle(NSLocalizedString("Next Keyboard", comment: "Title for 'Next Keyboard' button"), for: [])
         self.nextKeyboardButton.sizeToFit()

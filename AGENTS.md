@@ -104,15 +104,15 @@ What is **already wired up** from Phase 0 scaffold hardening:
 
 - App Group entitlements (`.entitlements` files for both targets) using `group.com.voiceflow.shared`.
 - `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist).
+- Extension-safe local Swift package [`VoiceFlow/VoiceFlowShared`](VoiceFlow/VoiceFlowShared) with shared model types.
 
 What is **not yet** wired up (remaining Phase 0 prerequisites — see [`ROADMAP.md`](ROADMAP.md) → Phase 0):
 
-- Shared models (`DictationRecord`, `PendingInsert`, `VocabularyEntry`, `VoiceFlowSettings`).
 - `SharedStoreClient` with the generation-counter concurrency protocol.
 - `SpeechEngine` protocol and `AppleSpeechEngine`.
 - `PostProcessor` rule pipeline.
 - Onboarding screens.
-- Deployment target reality-check (currently `26.4` in the project; the Phase 0 min-iOS investigation will set the real baseline).
+- Implementation code beyond scaffold hardening and shared model definitions.
 
 Do not skip Phase 0. The roadmap is gated.
 
@@ -172,8 +172,8 @@ When making technical decisions, respect these iOS constraints:
 1. Resolve any remaining doc inconsistencies introduced by edits.
 2. Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]`. **Done.**
 3. Set `RequestsOpenAccess = true` in the keyboard `Info.plist`. **Done.**
-4. Choose the deployment target after the min-iOS investigation; update the project settings.
-5. Stand up the shared framework / Swift package with the model types listed in [`docs/specs/data-and-storage.md`](docs/specs/data-and-storage.md).
+4. Choose the deployment target after the min-iOS investigation; update the project settings. **Done:** iOS 17.0 selected in [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md).
+5. Stand up the shared framework / Swift package with the model types listed in [`docs/specs/data-and-storage.md`](docs/specs/data-and-storage.md). **Done:** [`VoiceFlow/VoiceFlowShared`](VoiceFlow/VoiceFlowShared).
 6. Implement `SharedStoreClient` honoring the generation-counter protocol.
 7. Run the spikes listed in [`ROADMAP.md`](ROADMAP.md) → Phase 0. Each produces a written verdict.
 8. Draft privacy nutrition label, App Review narrative, and onboarding copy.

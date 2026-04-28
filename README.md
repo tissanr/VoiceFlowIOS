@@ -32,7 +32,7 @@ The containing app additionally owns onboarding, permissions, history, vocabular
 - **Specifications (canonical detail):** [`docs/specs/`](docs/specs/) — one file per topic
 - **Agent guide (shared across all AI agents):** [`AGENTS.md`](AGENTS.md)
 - **Claude-specific notes:** [`CLAUDE.md`](CLAUDE.md) — thin pointer to `AGENTS.md`
-- **Xcode project:** scaffolded under [`VoiceFlow/`](VoiceFlow) with four targets (`VoiceFlow`, `VoiceFlowKeyboard`, `VoiceFlowTests`, `VoiceFlowUITests`). Sources are stubs. **App Group entitlements and `RequestsOpenAccess` are wired; shared models and shared store are still pending** — these are Phase 0 prerequisites described in [`ROADMAP.md`](ROADMAP.md).
+- **Xcode project:** scaffolded under [`VoiceFlow/`](VoiceFlow) with four targets (`VoiceFlow`, `VoiceFlowKeyboard`, `VoiceFlowTests`, `VoiceFlowUITests`). Sources are stubs. **App Group entitlements, `RequestsOpenAccess`, and the shared model package are wired; shared store is still pending** — these are Phase 0 prerequisites described in [`ROADMAP.md`](ROADMAP.md).
 
 ## Key product constraints
 
@@ -47,6 +47,7 @@ VoiceFlow is unavailable in Secure Fields, Phone Pads, and apps that disable thi
 | App Group | `group.com.voiceflow.shared` |
 | Containing app bundle ID | `me.tissanr.VoiceFlow` |
 | Keyboard extension bundle ID | `me.tissanr.VoiceFlow.VoiceFlowKeyboard` |
+| Minimum iOS | `17.0` |
 
 ## Where to start
 

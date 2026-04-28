@@ -18,7 +18,7 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | Spec | Owns | Spec status | Implementation |
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟥 Not started |
-| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v1) | 🟧 In progress (App Group entitlements wired) |
+| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v1) | 🟧 In progress (App Group entitlements and shared models wired; `SharedStoreClient` pending) |
 | [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v1) | 🟥 Not started |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟥 Not started |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
@@ -63,7 +63,7 @@ Scaffold hardening (immediate, low-risk):
 
 - Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]` — see [data-and-storage](docs/specs/data-and-storage.md). **Done:** `VoiceFlow/VoiceFlow/VoiceFlow.entitlements` and `VoiceFlow/VoiceFlowKeyboard/VoiceFlowKeyboard.entitlements` are wired into target signing settings.
 - Set `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist) (so users *can* grant it; the app still works without). **Done.**
-- After the min-iOS investigation, set the project deployment target to the chosen baseline (currently reads `26.4`, which is unrealistic).
+- Set the project deployment target to the chosen baseline after the min-iOS investigation. **Done:** [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md) selected iOS 17.0 and the project now uses `IPHONEOS_DEPLOYMENT_TARGET = 17.0`.
 
 Spikes (each must produce a written verdict):
 
@@ -74,7 +74,7 @@ Spikes (each must produce a written verdict):
 - **Context** — read context before / after cursor; verify auto-capitalization and spacing logic.
 - **Audio** — interruption tests (call, Siri, Focus, headphone unplug) for both flows.
 - **Speech** — Apple Speech in German, English, and mixed; on-device availability per locale.
-- **Min-iOS investigation** — one-page comparison of iOS 17 / 18 / 26 covering Speech APIs, on-device support, SwiftData stability, audio session APIs, Keyboard Extension capabilities. Pick the lowest version with a meaningful simplicity win. Default baseline iOS 17.
+- **Min-iOS investigation** — one-page comparison of iOS 17 / 18 / 26 covering Speech APIs, on-device support, SwiftData stability, audio session APIs, Keyboard Extension capabilities. Pick the lowest version with a meaningful simplicity win. **Done:** iOS 17.0 selected; see [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md).
 - **Crash reporting** — decide MetricKit vs. third-party. (See [privacy-and-app-review](docs/specs/privacy-and-app-review.md).)
 
 Drafts:
@@ -205,9 +205,9 @@ Drafts:
 | How does the user return to the target app after recording? | Primary flow eliminates the return trip; fallback uses iOS breadcrumb / App Switcher with explicit "Switch back to <app>" copy. | [architecture](docs/specs/architecture.md) → Dual-flow architecture |
 | Auto-insert vs. manual Insert in MVP? | Manual Insert in MVP. Auto-insert post-MVP. | [architecture](docs/specs/architecture.md) → MVP scope |
 | Does the Keyboard Extension need `RequestsOpenAccess`? | `RequestsOpenAccess = true` so users *can* grant it. MVP works without via fallback flow. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) → Open Access policy |
-| Which App Group store is most robust? | UserDefaults for `PendingInsert` and small state; SwiftData or shared SQLite for history and vocabulary. Generation-counter protocol mandatory. | [data-and-storage](docs/specs/data-and-storage.md) |
+| Which App Group store is most robust? | UserDefaults for `PendingInsert` and small state; SwiftData in the App Group container for history and vocabulary. Generation-counter protocol mandatory. | [data-and-storage](docs/specs/data-and-storage.md), [min-iOS investigation](docs/spikes/min-ios-investigation.md) |
 | MVP LLM: local, remote, or interface only? | Interface + local rules in MVP. Remote LLM gated on a separate explicit privacy review. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) |
-| Minimum iOS version? | Decided in Phase 0 (min-iOS investigation). Default baseline iOS 17. | Phase 0 — this file |
+| Minimum iOS version? | iOS 17.0. | [min-iOS investigation](docs/spikes/min-ios-investigation.md) |
 | Launch languages? | German + English; mixed German / English dictation supported. | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) |
 | Audio temporarily storable for debugging? | Off by default; opt-in only. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) |
 | Keyboard-extension history size? | Last 5 entries loaded eagerly; full history only via the containing app. | [performance-and-memory](docs/specs/performance-and-memory.md) |

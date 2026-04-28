@@ -9,6 +9,14 @@ Local build flow, CI pipeline, and the code-signing constraints that come with r
 
 ---
 
+## Deployment target
+
+Minimum iOS version: **iOS 17.0**.
+
+This was selected in Phase 0 by [../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md). The project builds with the current SDK while targeting iOS 17.0.
+
+---
+
 ## Local builds
 
 ```sh
