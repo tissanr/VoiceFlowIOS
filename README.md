@@ -28,10 +28,11 @@ The containing app additionally owns onboarding, permissions, history, vocabular
 
 ## Repository state
 
-- **Specification:** [`ROADMAP.md`](ROADMAP.md) (canonical)
+- **Roadmap (index + phase status):** [`ROADMAP.md`](ROADMAP.md)
+- **Specifications (canonical detail):** [`docs/specs/`](docs/specs/) — one file per topic
 - **Agent guide (shared across all AI agents):** [`AGENTS.md`](AGENTS.md)
 - **Claude-specific notes:** [`CLAUDE.md`](CLAUDE.md) — thin pointer to `AGENTS.md`
-- **Xcode project:** scaffolded under [`VoiceFlow/`](VoiceFlow) with four targets (`VoiceFlow`, `VoiceFlowKeyboard`, `VoiceFlowTests`, `VoiceFlowUITests`). Sources are stubs. **App Group entitlements, `RequestsOpenAccess`, and shared models are not yet wired up** — these are Phase 0 prerequisites described in `ROADMAP.md`.
+- **Xcode project:** scaffolded under [`VoiceFlow/`](VoiceFlow) with four targets (`VoiceFlow`, `VoiceFlowKeyboard`, `VoiceFlowTests`, `VoiceFlowUITests`). Sources are stubs. **App Group entitlements, `RequestsOpenAccess`, and shared models are not yet wired up** — these are Phase 0 prerequisites described in [`ROADMAP.md`](ROADMAP.md).
 
 ## Key product constraints
 
@@ -49,6 +50,7 @@ VoiceFlow is unavailable in Secure Fields, Phone Pads, and apps that disable thi
 
 ## Where to start
 
-1. Read [`ROADMAP.md`](ROADMAP.md) for the full product spec, phase plan, and exit criteria.
-2. Read [`AGENTS.md`](AGENTS.md) before making any code changes — it is the shared contract for AI agents working in this repo.
-3. Phase 0 (foundation, spikes, privacy narrative) gates Phase 1. Do not skip it.
+1. Skim [`ROADMAP.md`](ROADMAP.md) for the spec index and current phase status.
+2. Open the relevant spec under [`docs/specs/`](docs/specs/) for the topic you're working on.
+3. Read [`AGENTS.md`](AGENTS.md) before making any code changes — it is the shared contract for AI agents working in this repo.
+4. Phase 0 (foundation, spikes, privacy narrative) gates Phase 1. Do not skip it.
