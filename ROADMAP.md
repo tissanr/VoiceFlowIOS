@@ -18,12 +18,12 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | Spec | Owns | Spec status | Implementation |
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟥 Not started |
-| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v1) | 🟥 Not started |
+| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v1) | 🟧 In progress (App Group entitlements wired) |
 | [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v1) | 🟥 Not started |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟥 Not started |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
 | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v1) | 🟥 Not started |
-| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v1) | 🟥 Not started (narrative drafted in Phase 0) |
+| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v1) | 🟧 In progress (`RequestsOpenAccess` enabled; narrative pending) |
 | [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v1) | 🟥 Not started (manual local builds work) |
 | [testing](docs/specs/testing.md) | Phase 0 spike tests, MVP acceptance tests, Phase 4 regression matrix | Accepted (v1) | 🟥 Not started (test targets are stubs) |
 
@@ -37,7 +37,7 @@ If a spec changes meaningfully, bump its version in the spec header and update t
 
 | Phase | Title | Status | Blocking exit criteria |
 | --- | --- | --- | --- |
-| Phase 0 | Foundation, Spikes, Privacy Narrative | 🟥 Not started | Scaffold hardening; in-keyboard recording spike verdict; Open Access posture; min-iOS decision; privacy narrative draft. |
+| Phase 0 | Foundation, Spikes, Privacy Narrative | 🟧 In progress | Scaffold hardening; in-keyboard recording spike verdict; Open Access posture; min-iOS decision; privacy narrative draft. |
 | Phase 1 | Keyboard MVP (both flows) + Secure-Field handling | 🟥 Not started | Phase 0 complete. |
 | Phase 2 | Postprocessing, Vocabulary, Accessibility hardening | 🟥 Not started | Phase 1 complete. |
 | Phase 3 | History, Analytics, Reuse | 🟥 Not started | Phase 2 complete. |
@@ -57,12 +57,12 @@ Each phase below lists exit criteria. The deep details live in the linked specs.
 
 ### Phase 0 — Foundation, Spikes, Privacy Narrative
 
-**Status:** 🟥 Not started
+**Status:** 🟧 In progress
 
 Scaffold hardening (immediate, low-risk):
 
-- Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]` — see [data-and-storage](docs/specs/data-and-storage.md).
-- Set `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist) (so users *can* grant it; the app still works without).
+- Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]` — see [data-and-storage](docs/specs/data-and-storage.md). **Done:** `VoiceFlow/VoiceFlow/VoiceFlow.entitlements` and `VoiceFlow/VoiceFlowKeyboard/VoiceFlowKeyboard.entitlements` are wired into target signing settings.
+- Set `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist) (so users *can* grant it; the app still works without). **Done.**
 - After the min-iOS investigation, set the project deployment target to the chosen baseline (currently reads `26.4`, which is unrealistic).
 
 Spikes (each must produce a written verdict):
