@@ -61,7 +61,7 @@ Each phase below lists exit criteria. The deep details live in the linked specs.
 
 Scaffold hardening (immediate, low-risk):
 
-- Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]` — see [data-and-storage](docs/specs/data-and-storage.md). **Done:** `VoiceFlow/VoiceFlow/VoiceFlow.entitlements` and `VoiceFlow/VoiceFlowKeyboard/VoiceFlowKeyboard.entitlements` are wired into target signing settings.
+- Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.me.tissanr.VoiceFlow.shared"]` — see [data-and-storage](docs/specs/data-and-storage.md). **Done:** `VoiceFlow/VoiceFlow/VoiceFlow.entitlements` and `VoiceFlow/VoiceFlowKeyboard/VoiceFlowKeyboard.entitlements` are wired into target signing settings.
 - Set `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist) (so users *can* grant it; the app still works without). **Done.**
 - Set the project deployment target to the chosen baseline after the min-iOS investigation. **Done:** [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md) selected iOS 17.0 and the project now uses `IPHONEOS_DEPLOYMENT_TARGET = 17.0`.
 

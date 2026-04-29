@@ -90,7 +90,7 @@ Targets:
 - `VoiceFlowTests`, `VoiceFlowUITests` — test targets.
 - A shared, extension-safe Swift package or framework for models, store contracts, postprocessing rules, and the `SpeechEngine` protocol.
 
-Shared App Group: `group.com.voiceflow.shared`.
+Shared App Group: `group.me.tissanr.VoiceFlow.shared`.
 
 For deeper design detail see [`docs/specs/architecture.md`](docs/specs/architecture.md).
 
@@ -102,7 +102,7 @@ The Xcode project **is scaffolded** at [`VoiceFlow/VoiceFlow.xcodeproj`](VoiceFl
 
 What is **already wired up** from Phase 0 scaffold hardening:
 
-- App Group entitlements (`.entitlements` files for both targets) using `group.com.voiceflow.shared`.
+- App Group entitlements (`.entitlements` files for both targets) using `group.me.tissanr.VoiceFlow.shared`.
 - `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist).
 - Extension-safe local Swift package [`VoiceFlow/VoiceFlowShared`](VoiceFlow/VoiceFlowShared) with shared model types.
 - `PendingInsert` `SharedStoreClient` using the generation-counter concurrency protocol.
@@ -162,7 +162,7 @@ When making technical decisions, respect these iOS constraints:
 - The canonical detail is in `docs/specs/`. If there's a contradiction between code and a spec, fix the code or update the spec explicitly — do not silently diverge.
 - The `README.md` is reader-facing. Keep it short and pointed; product detail belongs in the specs.
 - Resolve merge conflicts before committing; do not commit `<<<<<<<` markers.
-- The App Group ID `group.com.voiceflow.shared` must match in: project entitlements (both targets), `SharedStoreClient` source, and any docs that mention it. There is no other App Group ID in this project.
+- The App Group ID `group.me.tissanr.VoiceFlow.shared` must match in: project entitlements (both targets), `SharedStoreClient` source, and any docs that mention it. There is no other App Group ID in this project.
 - When you finish work that moves a phase or a spec forward, update the status in **both** the spec header and the `ROADMAP.md` tables.
 
 ---
@@ -170,7 +170,7 @@ When making technical decisions, respect these iOS constraints:
 ## Phase-0 prerequisites (the immediate work, in order)
 
 1. Resolve any remaining doc inconsistencies introduced by edits.
-2. Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.com.voiceflow.shared"]`. **Done.**
+2. Add `.entitlements` files for both targets with `com.apple.security.application-groups = ["group.me.tissanr.VoiceFlow.shared"]`. **Done.**
 3. Set `RequestsOpenAccess = true` in the keyboard `Info.plist`. **Done.**
 4. Choose the deployment target after the min-iOS investigation; update the project settings. **Done:** iOS 17.0 selected in [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md).
 5. Stand up the shared framework / Swift package with the model types listed in [`docs/specs/data-and-storage.md`](docs/specs/data-and-storage.md). **Done:** [`VoiceFlow/VoiceFlowShared`](VoiceFlow/VoiceFlowShared).

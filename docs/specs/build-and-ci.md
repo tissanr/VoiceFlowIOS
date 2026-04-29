@@ -61,7 +61,7 @@ Default CI host: GitHub Actions. Concrete workflow file added in Phase 0.
 ## Code signing
 
 - **Team:** `me.tissanr` for both targets.
-- Containing app and keyboard extension must use **provisioning profiles that include the App Group entitlement** `group.com.voiceflow.shared`.
+- Containing app and keyboard extension must use **provisioning profiles that include the App Group entitlement** `group.me.tissanr.VoiceFlow.shared`.
 - The keyboard extension's profile does not need a separate microphone entitlement; the entitlement comes from the keyboard extension's `Info.plist` (`NSMicrophoneUsageDescription`) plus `RequestsOpenAccess`.
 - Bundle IDs:
   - Containing app: `me.tissanr.VoiceFlow`

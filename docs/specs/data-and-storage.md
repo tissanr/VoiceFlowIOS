@@ -13,7 +13,7 @@ Models, the App Group store layout, and the cross-process concurrency protocol t
 
 | Identifier | Value |
 | --- | --- |
-| App Group | `group.com.voiceflow.shared` |
+| App Group | `group.me.tissanr.VoiceFlow.shared` |
 | Containing app bundle ID | `me.tissanr.VoiceFlow` |
 | Keyboard extension bundle ID | `me.tissanr.VoiceFlow.VoiceFlowKeyboard` |
 
@@ -25,7 +25,7 @@ The App Group ID must match in both targets' `.entitlements`, in `SharedStoreCli
 
 | Data | Storage | Reason |
 | --- | --- | --- |
-| `PendingInsert`, `KeyboardState`, generation counter | `UserDefaults(suiteName: "group.com.voiceflow.shared")` | Atomic per-key, suitable for extension/app handoffs. |
+| `PendingInsert`, `KeyboardState`, generation counter | `UserDefaults(suiteName: "group.me.tissanr.VoiceFlow.shared")` | Atomic per-key, suitable for extension/app handoffs. |
 | `DictationRecord` (history) | SwiftData in the App Group container | Higher volume than `PendingInsert`; selected by the Phase 0 min-iOS investigation. |
 | `VocabularyEntry` | SwiftData in the App Group container | Indexed lookup needed for postprocessing. |
 | `VoiceFlowSettings` | UserDefaults (subset readable from extension) | Small, hot, atomic. |
@@ -152,7 +152,7 @@ struct VoiceFlowSettings: Codable {
 ### Keys
 
 ```text
-UserDefaults(suiteName: "group.com.voiceflow.shared")
+UserDefaults(suiteName: "group.me.tissanr.VoiceFlow.shared")
 
   pendingInsert.payload      // Codable PendingInsert blob
   pendingInsert.generation   // monotonic Int, incremented on every write

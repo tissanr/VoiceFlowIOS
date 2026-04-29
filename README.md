@@ -44,7 +44,7 @@ VoiceFlow is unavailable in Secure Fields, Phone Pads, and apps that disable thi
 
 | Identifier | Value |
 | --- | --- |
-| App Group | `group.com.voiceflow.shared` |
+| App Group | `group.me.tissanr.VoiceFlow.shared` |
 | Containing app bundle ID | `me.tissanr.VoiceFlow` |
 | Keyboard extension bundle ID | `me.tissanr.VoiceFlow.VoiceFlowKeyboard` |
 | Minimum iOS | `17.0` |
