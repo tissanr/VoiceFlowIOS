@@ -1,7 +1,7 @@
 # Spec: Data & Storage
 
 > **Spec status:** Accepted (v2)
-> **Implementation status:** In progress (App Group entitlements, shared model package, and `PendingInsert` `SharedStoreClient` wired; SwiftData history/vocabulary store pending)
+> **Implementation status:** In progress (App Group entitlements, shared model package, and `PendingInsert` `SharedStoreClient` verified under contention; SwiftData history/vocabulary store pending)
 > **Last updated:** 2026-04-29
 > **Owners:** iOS
 

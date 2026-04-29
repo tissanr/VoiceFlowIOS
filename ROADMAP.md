@@ -37,7 +37,7 @@ If a spec changes meaningfully, bump its version in the spec header and update t
 
 | Phase | Title | Status | Blocking exit criteria |
 | --- | --- | --- | --- |
-| Phase 0 | Foundation, Spikes, Privacy Narrative | 🟧 In progress | Scaffold hardening; in-keyboard recording spike verdict; Open Access posture; min-iOS decision; privacy narrative draft. |
+| Phase 0 | Foundation, Spikes, Privacy Narrative | 🟧 In progress | App Group store verdict done; in-keyboard recording spike verdict; Open Access posture; privacy narrative draft. |
 | Phase 1 | Keyboard MVP (both flows) + Secure-Field handling | 🟥 Not started | Phase 0 complete. |
 | Phase 2 | Postprocessing, Vocabulary, Accessibility hardening | 🟥 Not started | Phase 1 complete. |
 | Phase 3 | History, Analytics, Reuse | 🟥 Not started | Phase 2 complete. |
@@ -69,7 +69,7 @@ Spikes (each must produce a written verdict):
 
 - **In-keyboard recording** — microphone + `SFSpeechRecognizer` inside the Keyboard Extension on the chosen iOS baseline; measure peak memory, latency, stability over 5 min of repeated 10 s dictations. Verdict: primary flow viable / not viable / device-class dependent. (See [performance-and-memory](docs/specs/performance-and-memory.md), [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md).)
 - **Open Access** — confirm `openURL` and microphone-in-extension behavior with and without Open Access. Verdict: feature matrix. (See [privacy-and-app-review](docs/specs/privacy-and-app-review.md).)
-- **App Group store** — `SharedStoreClient` with the generation-counter protocol is implemented for `PendingInsert`; cross-process contention spike passed with file-lock + synchronized suite access. **Done:** see [`docs/spikes/app-group-store-contention.md`](docs/spikes/app-group-store-contention.md).
+- **App Group store** — `SharedStoreClient` with the generation-counter protocol is implemented for `PendingInsert`; cross-process contention spike passed with file-lock + synchronized suite access. **Done. Verdict:** viable for Phase 1 if all app/extension code uses `SharedStoreClient`; direct raw key access is prohibited. See [`docs/spikes/app-group-store-contention.md`](docs/spikes/app-group-store-contention.md).
 - **Insert** — insert in Notes, Mail, Messages, Safari, plus a known masked field. (See [keyboard-and-insert](docs/specs/keyboard-and-insert.md).)
 - **Context** — read context before / after cursor; verify auto-capitalization and spacing logic.
 - **Audio** — interruption tests (call, Siri, Focus, headphone unplug) for both flows.
