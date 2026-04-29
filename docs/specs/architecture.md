@@ -2,7 +2,7 @@
 
 > **Spec status:** Accepted (v1)
 > **Implementation status:** In progress (shared model package wired; app and keyboard implementations pending)
-> **Last updated:** 2026-04-28
+> **Last updated:** 2026-04-29
 > **Owners:** product + iOS
 
 ---
@@ -234,7 +234,7 @@ Current shared package path: [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/V
 | Speech recognition (MVP) | `SFSpeechRecognizer` + `supportsOnDeviceRecognition` |
 | Postprocessing | Rule pipeline + optional local LLM adapter |
 | Persistence | SwiftData in the App Group container for history and vocabulary |
-| Extension comms | App Groups + UserDefaults + SwiftData |
+| Extension comms | App Groups + locked suite preferences + SwiftData |
 | Shortcuts | App Intents |
 | Later offline ASR | Whisper / Core ML or whisper.cpp / Metal |
 

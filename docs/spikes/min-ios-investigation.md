@@ -3,7 +3,7 @@
 > **Status:** Done
 > **Verdict date:** 2026-04-28
 > **Decision:** Minimum deployment target is **iOS 17.0**.
-> **Persistence decision:** Use **SwiftData in the App Group container** for history and vocabulary; keep `PendingInsert`, reduced settings, and generation counters in App Group `UserDefaults`.
+> **Persistence decision:** Use **SwiftData in the App Group container** for history and vocabulary; keep `PendingInsert`, reduced settings, and generation counters in App Group suite preferences through `SharedStoreClient`.
 
 ## Question
 
@@ -30,7 +30,7 @@ iOS 17 provides the APIs VoiceFlow needs for the MVP:
 - Custom Keyboard Open Access behavior is unchanged for the MVP: setting `RequestsOpenAccess = true` lets users grant access; without it, the fallback flow remains required.
 - `AVAudioSession` recording categories are mature and predate iOS 17.
 
-iOS 18 does not add a required MVP simplification. It improves parts of SwiftData's lower-level store APIs, but the MVP can avoid those by using standard SwiftData models and keeping cross-process handoff state in `UserDefaults`.
+iOS 18 does not add a required MVP simplification. It improves parts of SwiftData's lower-level store APIs, but the MVP can avoid those by using standard SwiftData models and keeping cross-process handoff state in App Group suite preferences through `SharedStoreClient`.
 
 iOS 26 adds the newer SpeechAnalyzer / SpeechTranscriber / DictationTranscriber family, but adopting iOS 26 would unnecessarily exclude users and does not remove the Phase 0 need to test microphone + speech inside the Keyboard Extension. Those APIs can be evaluated later behind availability checks.
 
@@ -42,7 +42,7 @@ iOS 26 adds the newer SpeechAnalyzer / SpeechTranscriber / DictationTranscriber 
 | On-device speech | Runtime-dependent by locale/device through `supportsOnDeviceRecognition` | Same MVP requirement | Newer installed/downloadable locale APIs exist for transcribers | Runtime check still mandatory |
 | Custom vocabulary | `SFSpeechLanguageModel` and `customizedLanguageModel` available | Same MVP path | Adds newer weighting/customization knobs | Postprocessing vocabulary remains MVP default |
 | Keyboard Extension | Custom keyboard + Open Access model supports required architecture | No known MVP simplification | No required MVP simplification | Keep dual-flow design |
-| App Group handoff | `UserDefaults(suiteName:)` and App Group containers are sufficient | Same | Same | Use generation-counter `UserDefaults` protocol |
+| App Group handoff | App Group suite preferences and containers are sufficient | Same | Same | Use generation-counter protocol through `SharedStoreClient` |
 | History/vocabulary storage | SwiftData available with App Group configuration | More lower-level SwiftData APIs, not required | More SwiftData APIs, not required | Use SwiftData for history/vocabulary |
 | Audio session | `record` / `playAndRecord` categories available and mature | Same | Same plus newer unrelated capabilities | No reason to raise target |
 
@@ -55,7 +55,7 @@ Rationale:
 - SwiftData is available on iOS 17 and can be configured for an App Group container.
 - It avoids adding a SQLite wrapper dependency during Phase 0.
 - The Keyboard Extension only needs lightweight reads, not long-running writes or full-history queries.
-- The contentious cross-process object, `PendingInsert`, stays out of SwiftData and uses the mandatory generation-counter `UserDefaults` protocol.
+- The contentious cross-process object, `PendingInsert`, stays out of SwiftData and uses the mandatory generation-counter protocol through `SharedStoreClient`.
 
 Guardrail:
 

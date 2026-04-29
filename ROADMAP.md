@@ -1,6 +1,6 @@
 # VoiceFlow iOS — Roadmap
 
-> **Last updated:** 2026-04-28
+> **Last updated:** 2026-04-29
 > **Purpose:** Index of specifications, implementation status, and phase plan. The detailed product spec lives in [`docs/specs/`](docs/specs/) — start there for any deep dive.
 
 ---
@@ -18,14 +18,14 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | Spec | Owns | Spec status | Implementation |
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟥 Not started |
-| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v1) | 🟧 In progress (`PendingInsert` shared-store handoff wired; SwiftData history/vocabulary store pending) |
+| [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v2) | 🟧 In progress (`PendingInsert` shared-store handoff verified under contention; SwiftData history/vocabulary store pending) |
 | [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v1) | 🟥 Not started |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟥 Not started |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
 | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v1) | 🟥 Not started |
 | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v1) | 🟧 In progress (`RequestsOpenAccess` enabled; narrative pending) |
 | [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v1) | 🟥 Not started (manual local builds work) |
-| [testing](docs/specs/testing.md) | Phase 0 spike tests, MVP acceptance tests, Phase 4 regression matrix | Accepted (v1) | 🟥 Not started (test targets are stubs) |
+| [testing](docs/specs/testing.md) | Phase 0 spike tests, MVP acceptance tests, Phase 4 regression matrix | Accepted (v1) | 🟧 In progress (`VoiceFlowShared` tests and App Group contention spike harness exist) |
 
 **Status legend:** 🟥 Not started · 🟧 In progress · 🟨 Awaiting review · 🟩 Done · ⬛ Superseded
 
@@ -69,7 +69,7 @@ Spikes (each must produce a written verdict):
 
 - **In-keyboard recording** — microphone + `SFSpeechRecognizer` inside the Keyboard Extension on the chosen iOS baseline; measure peak memory, latency, stability over 5 min of repeated 10 s dictations. Verdict: primary flow viable / not viable / device-class dependent. (See [performance-and-memory](docs/specs/performance-and-memory.md), [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md).)
 - **Open Access** — confirm `openURL` and microphone-in-extension behavior with and without Open Access. Verdict: feature matrix. (See [privacy-and-app-review](docs/specs/privacy-and-app-review.md).)
-- **App Group store** — `SharedStoreClient` with the generation-counter protocol is implemented for `PendingInsert`; verify cross-process consistency under contention. (See [data-and-storage](docs/specs/data-and-storage.md).)
+- **App Group store** — `SharedStoreClient` with the generation-counter protocol is implemented for `PendingInsert`; cross-process contention spike passed with file-lock + synchronized suite access. **Done:** see [`docs/spikes/app-group-store-contention.md`](docs/spikes/app-group-store-contention.md).
 - **Insert** — insert in Notes, Mail, Messages, Safari, plus a known masked field. (See [keyboard-and-insert](docs/specs/keyboard-and-insert.md).)
 - **Context** — read context before / after cursor; verify auto-capitalization and spacing logic.
 - **Audio** — interruption tests (call, Siri, Focus, headphone unplug) for both flows.
@@ -205,7 +205,7 @@ Drafts:
 | How does the user return to the target app after recording? | Primary flow eliminates the return trip; fallback uses iOS breadcrumb / App Switcher with explicit "Switch back to <app>" copy. | [architecture](docs/specs/architecture.md) → Dual-flow architecture |
 | Auto-insert vs. manual Insert in MVP? | Manual Insert in MVP. Auto-insert post-MVP. | [architecture](docs/specs/architecture.md) → MVP scope |
 | Does the Keyboard Extension need `RequestsOpenAccess`? | `RequestsOpenAccess = true` so users *can* grant it. MVP works without via fallback flow. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) → Open Access policy |
-| Which App Group store is most robust? | UserDefaults for `PendingInsert` and small state; SwiftData in the App Group container for history and vocabulary. Generation-counter protocol mandatory. | [data-and-storage](docs/specs/data-and-storage.md), [min-iOS investigation](docs/spikes/min-ios-investigation.md) |
+| Which App Group store is most robust? | Locked, synchronized suite preferences for `PendingInsert` and small state; SwiftData in the App Group container for history and vocabulary. Generation-counter protocol mandatory. | [data-and-storage](docs/specs/data-and-storage.md), [min-iOS investigation](docs/spikes/min-ios-investigation.md), [App Group store spike](docs/spikes/app-group-store-contention.md) |
 | MVP LLM: local, remote, or interface only? | Interface + local rules in MVP. Remote LLM gated on a separate explicit privacy review. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) |
 | Minimum iOS version? | iOS 17.0. | [min-iOS investigation](docs/spikes/min-ios-investigation.md) |
 | Launch languages? | German + English; mixed German / English dictation supported. | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) |
@@ -227,4 +227,4 @@ Drafts:
 | No insert in Secure Fields | iOS replaces custom keyboard with system keyboard | Detected pre-record in Phase 1; communicate clearly |
 | Apple Speech unavailable offline | Locale / device / iOS dependency | Per-locale availability check at runtime; allow online mode or evaluate Whisper later |
 | LLM hallucinates formatting | Generative model | Guardrails + fallback to raw text; LLM disabled by default |
-| App Group race conditions | Cross-process UserDefaults sync | Generation-counter protocol with `consumedGen` tombstone |
+| App Group race conditions | Cross-process suite sync | `SharedStoreClient` file lock + generation-counter protocol with `consumedGen` tombstone |
