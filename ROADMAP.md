@@ -1,7 +1,46 @@
 # VoiceFlow iOS — Roadmap
 
-> **Last updated:** 2026-04-29
+> **Last updated:** 2026-05-05
 > **Purpose:** Index of specifications, implementation status, and phase plan. The detailed product spec lives in [`docs/specs/`](docs/specs/) — start there for any deep dive.
+
+---
+
+## Implementation Status
+
+Start here to see where the project is. The table is intentionally split by subphase so the active work is visible without reading the whole roadmap.
+
+**Status legend:** 🟥 Not started · 🟧 In progress · 🟨 Awaiting review / blocked · 🟩 Done · ⬛ Superseded
+
+| Phase | Subphase | Status | Current state / next gate |
+| --- | --- | --- | --- |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.1 Docs and decision alignment | 🟩 Done | Subphase tracker added; architecture implementation status now matches the spec. Keep specs and roadmap in sync as future decisions land. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.2 App Group + Open Access scaffold | 🟩 Done | App and keyboard entitlements are wired; keyboard `RequestsOpenAccess = true`. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.3 Minimum iOS baseline | 🟩 Done | iOS 17.0 selected in [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md) and applied to the project. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.4 Shared package + `PendingInsert` store | 🟩 Done | `VoiceFlowShared` model package and generation-counter `SharedStoreClient` exist; App Group contention spike passed. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.5 In-keyboard recording spike | 🟧 In progress | Harness exists; real-device memory, latency, and stability verdict still pending. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.6 Remaining platform spikes | 🟥 Not started | Open Access behavior, insert, context, audio interruption, speech locale, and crash-reporting verdicts still pending. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.7 Privacy / App Review / onboarding drafts | 🟥 Not started | Privacy nutrition label, App Review narrative, and onboarding copy still pending. |
+| Phase 1 — Keyboard MVP with Secure-Field handling | 1.1 Keyboard UI state shell | 🟥 Not started | Build Compact, Recording, Transcribing, Reviewing, Pending, and InsertUnavailable states after Phase 0 sign-off. |
+| Phase 1 — Keyboard MVP with Secure-Field handling | 1.2 Primary in-keyboard dictation flow | 🟥 Not started | Requires Phase 0 in-keyboard recording verdict. |
+| Phase 1 — Keyboard MVP with Secure-Field handling | 1.3 Fallback containing-app handoff flow | 🟥 Not started | Requires Phase 0 handoff and App Group assumptions to stay valid. |
+| Phase 1 — Keyboard MVP with Secure-Field handling | 1.4 Manual insert + unsupported-field fallback | 🟥 Not started | Covers `UITextDocumentProxy.insertText(...)`, Secure Fields, Phone Pads, disabled keyboards, and clipboard fallback. |
+| Phase 1 — Keyboard MVP with Secure-Field handling | 1.5 MVP onboarding, accessibility, and diagnostics baseline | 🟥 Not started | Covers activation flow, Open Access trade-off, VoiceOver labels, Dynamic Type baseline, and MetricKit surfacing. |
+| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.1 `PostProcessor` rule pipeline | 🟥 Not started | Correction levels and deterministic local rules. |
+| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.2 Vocabulary learning + management UI | 🟥 Not started | Learn from raw vs. corrected text; show, edit, delete, and disable vocabulary entries. |
+| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.3 LLM adapter interface + guardrails | 🟥 Not started | Exchangeable interface only; remote LLM remains gated by explicit privacy review. |
+| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.4 Accessibility and localization hardening | 🟥 Not started | VoiceOver primary flow, German + English strings, Dynamic Type, contrast, and mixed-language handling. |
+| Phase 3 — History, Analytics, Reuse | 3.1 History search and reuse | 🟥 Not started | Full history, search, and reuse from the containing app. |
+| Phase 3 — History, Analytics, Reuse | 3.2 Keyboard latest / favorites / snippets | 🟥 Not started | Memory-budget-aware access to recent and saved text from the keyboard. |
+| Phase 3 — History, Analytics, Reuse | 3.3 Local analytics + App Shortcuts | 🟥 Not started | Words, WPM, streaks, latest dictation shortcuts, copy latest, and share latest. |
+| Phase 4 — Robustness, Edge Cases, Performance Budgets | 4.1 Insert edge-case hardening | 🟥 Not started | Marked text, RTL, undo grouping, masked fields, predictive overrides, spacing, and selection behavior. |
+| Phase 4 — Robustness, Edge Cases, Performance Budgets | 4.2 App Group sync hardening | 🟥 Not started | Low-memory behavior, fast app switching, and poor-condition sync validation. |
+| Phase 4 — Robustness, Edge Cases, Performance Budgets | 4.3 Lowest-device performance validation | 🟥 Not started | Re-measure all numeric budgets on the lowest-supported device class. |
+| Phase 4 — Robustness, Edge Cases, Performance Budgets | 4.4 Layout and RTL hardening | 🟥 Not started | Landscape, small displays, RTL layout safety, and logical-order insertion. |
+| Phase 5 — Optional Offline ASR | 5.1 Offline ASR evaluation | 🟥 Not started | Only starts if Apple Speech is proven insufficient for a defined user segment. |
+| Phase 5 — Optional Offline ASR | 5.2 Fully local mode decision | 🟥 Not started | Decide whether Whisper / Core ML meaningfully improves privacy, quality, or reliability. |
+| Phase 6 — Release Readiness | 6.1 Release privacy package | 🟥 Not started | Final permission copy, privacy text, nutrition label, and App Review narrative. |
+| Phase 6 — Release Readiness | 6.2 Data deletion, export, and backup | 🟥 Not started | User-facing controls for history and vocabulary lifecycle. |
+| Phase 6 — Release Readiness | 6.3 Release pipeline and submission readiness | 🟥 Not started | fastlane, TestFlight, App Store Connect, active engine display, and final review pass. |
 
 ---
 
@@ -17,7 +56,7 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 
 | Spec | Owns | Spec status | Implementation |
 | --- | --- | --- | --- |
-| [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟥 Not started |
+| [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟧 In progress (shared model package wired; app and keyboard implementations pending) |
 | [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v2) | 🟧 In progress (`PendingInsert` shared-store handoff verified under contention; SwiftData history/vocabulary store pending) |
 | [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v1) | 🟥 Not started |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟥 Not started |
@@ -33,27 +72,9 @@ If a spec changes meaningfully, bump its version in the spec header and update t
 
 ---
 
-## Implementation status — phases
-
-| Phase | Title | Status | Blocking exit criteria |
-| --- | --- | --- | --- |
-| Phase 0 | Foundation, Spikes, Privacy Narrative | 🟧 In progress | App Group store verdict done; in-keyboard recording spike verdict; Open Access posture; privacy narrative draft. |
-| Phase 1 | Keyboard MVP (both flows) + Secure-Field handling | 🟥 Not started | Phase 0 complete. |
-| Phase 2 | Postprocessing, Vocabulary, Accessibility hardening | 🟥 Not started | Phase 1 complete. |
-| Phase 3 | History, Analytics, Reuse | 🟥 Not started | Phase 2 complete. |
-| Phase 4 | Robustness, Edge Cases, Performance Budgets | 🟥 Not started | Phase 3 complete. |
-| Phase 5 | Optional Offline ASR (gated by proven need) | 🟥 Not started | Apple Speech proven insufficient. |
-| Phase 6 | Release Readiness | 🟥 Not started | All prior phases complete. |
-
-**Status legend:** 🟥 Not started · 🟧 In progress · 🟨 Blocked · 🟩 Done
-
-When a phase moves to In progress, list the active sub-items inline under that phase below.
-
----
-
 ## Phase plan (summary)
 
-Each phase below lists exit criteria. The deep details live in the linked specs.
+Each phase below lists exit criteria. The deep details live in the linked specs, and the current subphase status lives in the implementation table at the top.
 
 ### Phase 0 — Foundation, Spikes, Privacy Narrative
 
