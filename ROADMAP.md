@@ -67,7 +67,7 @@ Scaffold hardening (immediate, low-risk):
 
 Spikes (each must produce a written verdict):
 
-- **In-keyboard recording** — microphone + `SFSpeechRecognizer` inside the Keyboard Extension on the chosen iOS baseline; measure peak memory, latency, stability over 5 min of repeated 10 s dictations. Verdict: primary flow viable / not viable / device-class dependent. (See [performance-and-memory](docs/specs/performance-and-memory.md), [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md).)
+- **In-keyboard recording** — microphone + `SFSpeechRecognizer` inside the Keyboard Extension on the chosen iOS baseline; measure peak memory, latency, stability over 5 min of repeated 10 s dictations. Harness implemented; real-device verdict pending. See [`docs/spikes/in-keyboard-recording.md`](docs/spikes/in-keyboard-recording.md). (See [performance-and-memory](docs/specs/performance-and-memory.md), [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md).)
 - **Open Access** — confirm `openURL` and microphone-in-extension behavior with and without Open Access. Verdict: feature matrix. (See [privacy-and-app-review](docs/specs/privacy-and-app-review.md).)
 - **App Group store** — `SharedStoreClient` with the generation-counter protocol is implemented for `PendingInsert`; cross-process contention spike passed with file-lock + synchronized suite access. **Done. Verdict:** viable for Phase 1 if all app/extension code uses `SharedStoreClient`; direct raw key access is prohibited. See [`docs/spikes/app-group-store-contention.md`](docs/spikes/app-group-store-contention.md).
 - **Insert** — insert in Notes, Mail, Messages, Safari, plus a known masked field. (See [keyboard-and-insert](docs/specs/keyboard-and-insert.md).)
