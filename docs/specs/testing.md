@@ -1,8 +1,8 @@
 # Spec: Testing
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** Not started (test targets exist as stubs)
-> **Last updated:** 2026-04-28
+> **Implementation status:** In progress (`VoiceFlowShared` unit tests and App Group contention spike harness exist)
+> **Last updated:** 2026-04-29
 > **Owners:** iOS
 
 Test plan for the spike phase, the MVP, and recurring regression checks.
@@ -17,7 +17,7 @@ Test plan for the spike phase, the MVP, and recurring regression checks.
 - Behavior **without App Group access** (entitlement misconfigured) — `KeyboardState.noSharedAccess` shown.
 - **Apple Speech** in German, English, mixed German / English.
 - **In-keyboard recording** on iPhone 12 / 14 / 15 / 16 (or chosen device set) — peak memory + tap-to-record latency under [performance budgets](performance-and-memory.md).
-- **App Group concurrency** under contention — interleaved writes from app + extension; verify the generation-counter protocol from [data-and-storage.md](data-and-storage.md).
+- **App Group concurrency** under contention — interleaved writes from app + extension; verify the generation-counter protocol from [data-and-storage.md](data-and-storage.md). **Done for `PendingInsert`:** [../spikes/app-group-store-contention.md](../spikes/app-group-store-contention.md).
 - **`openURL` from extension** with and without Open Access.
 
 ---

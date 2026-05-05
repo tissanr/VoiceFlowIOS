@@ -1,8 +1,8 @@
 # Spec: Architecture
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** Not started (Phase 0 pending)
-> **Last updated:** 2026-04-28
+> **Implementation status:** In progress (shared model package wired; app and keyboard implementations pending)
+> **Last updated:** 2026-04-29
 > **Owners:** product + iOS
 
 ---
@@ -218,6 +218,8 @@ Shared (extension-safe Swift package or framework)
 
 Code that uses APIs **unavailable to extensions** stays exclusively in the containing app. The shared framework must compile against the extension-safe API subset.
 
+Current shared package path: [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/VoiceFlowShared).
+
 ---
 
 ## Core technologies
@@ -231,8 +233,8 @@ Code that uses APIs **unavailable to extensions** stays exclusively in the conta
 | Audio recording | `AVAudioSession`, `AVAudioEngine` |
 | Speech recognition (MVP) | `SFSpeechRecognizer` + `supportsOnDeviceRecognition` |
 | Postprocessing | Rule pipeline + optional local LLM adapter |
-| Persistence | SwiftData or SQLite (decided in Phase 0 min-iOS investigation) |
-| Extension comms | App Groups + UserDefaults + (SwiftData / SQLite) |
+| Persistence | SwiftData in the App Group container for history and vocabulary |
+| Extension comms | App Groups + locked suite preferences + SwiftData |
 | Shortcuts | App Intents |
 | Later offline ASR | Whisper / Core ML or whisper.cpp / Metal |
 

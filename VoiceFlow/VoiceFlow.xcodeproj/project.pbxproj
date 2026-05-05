@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D4CD20022FA1000000736CEE /* VoiceFlowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20002FA1000000736CEE /* VoiceFlowShared */; };
+		D4CD20032FA1000000736CEE /* VoiceFlowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20012FA1000000736CEE /* VoiceFlowShared */; };
 		D4CD11692FA0FFE400736CEE /* VoiceFlowKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D4CD11622FA0FFE400736CEE /* VoiceFlowKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -93,6 +95,7 @@
 		D4CD11312FA0FF8D00736CEE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				D4CD20022FA1000000736CEE /* VoiceFlowShared in Frameworks */,
 			);
 		};
 		D4CD113E2FA0FF8E00736CEE /* Frameworks */ = {
@@ -108,6 +111,7 @@
 		D4CD115F2FA0FFE400736CEE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				D4CD20032FA1000000736CEE /* VoiceFlowShared in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -156,6 +160,9 @@
 				D4CD11362FA0FF8D00736CEE /* VoiceFlow */,
 			);
 			name = VoiceFlow;
+			packageProductDependencies = (
+				D4CD20002FA1000000736CEE /* VoiceFlowShared */,
+			);
 			productName = VoiceFlow;
 			productReference = D4CD11342FA0FF8D00736CEE /* VoiceFlow.app */;
 			productType = "com.apple.product-type.application";
@@ -216,6 +223,9 @@
 				D4CD11632FA0FFE400736CEE /* VoiceFlowKeyboard */,
 			);
 			name = VoiceFlowKeyboard;
+			packageProductDependencies = (
+				D4CD20012FA1000000736CEE /* VoiceFlowShared */,
+			);
 			productName = VoiceFlowKeyboard;
 			productReference = D4CD11622FA0FFE400736CEE /* VoiceFlowKeyboard.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -255,6 +265,9 @@
 			);
 			mainGroup = D4CD112B2FA0FF8D00736CEE;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D4CD20042FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowShared" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = D4CD11352FA0FF8D00736CEE /* Products */;
 			projectDirPath = "";
@@ -385,7 +398,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -442,7 +455,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -526,7 +539,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = A2W56RK8VG;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = me.tissanr.VoiceFlowTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -548,7 +561,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = A2W56RK8VG;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = me.tissanr.VoiceFlowTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -704,6 +717,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		D4CD20042FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowShared" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = VoiceFlowShared;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D4CD20002FA1000000736CEE /* VoiceFlowShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D4CD20042FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowShared" */;
+			productName = VoiceFlowShared;
+		};
+		D4CD20012FA1000000736CEE /* VoiceFlowShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D4CD20042FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowShared" */;
+			productName = VoiceFlowShared;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D4CD112C2FA0FF8D00736CEE /* Project object */;
 }

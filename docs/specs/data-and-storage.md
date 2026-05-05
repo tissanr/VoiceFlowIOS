@@ -1,8 +1,8 @@
 # Spec: Data & Storage
 
-> **Spec status:** Accepted (v1)
-> **Implementation status:** In progress (App Group entitlements wired; shared models and store pending)
-> **Last updated:** 2026-04-28
+> **Spec status:** Accepted (v2)
+> **Implementation status:** In progress (App Group entitlements, shared model package, and `PendingInsert` `SharedStoreClient` verified under contention; SwiftData history/vocabulary store pending)
+> **Last updated:** 2026-04-29
 > **Owners:** iOS
 
 Models, the App Group store layout, and the cross-process concurrency protocol that connects the containing app to the Keyboard Extension.
@@ -13,7 +13,7 @@ Models, the App Group store layout, and the cross-process concurrency protocol t
 
 | Identifier | Value |
 | --- | --- |
-| App Group | `group.com.voiceflow.shared` |
+| App Group | `group.me.tissanr.VoiceFlow.shared` |
 | Containing app bundle ID | `me.tissanr.VoiceFlow` |
 | Keyboard extension bundle ID | `me.tissanr.VoiceFlow.VoiceFlowKeyboard` |
 
@@ -25,13 +25,17 @@ The App Group ID must match in both targets' `.entitlements`, in `SharedStoreCli
 
 | Data | Storage | Reason |
 | --- | --- | --- |
-| `PendingInsert`, `KeyboardState`, generation counter | `UserDefaults(suiteName: "group.com.voiceflow.shared")` | Atomic per-key, suitable for extension/app handoffs. |
-| `DictationRecord` (history) | SwiftData *or* shared SQLite in the App Group container | Higher volume; choice deferred to Phase 0 min-iOS investigation. |
-| `VocabularyEntry` | Same store as `DictationRecord` | Indexed lookup needed for postprocessing. |
-| `VoiceFlowSettings` | UserDefaults (subset readable from extension) | Small, hot, atomic. |
+| `PendingInsert`, `KeyboardState`, generation counter | App Group suite preferences via `SharedStoreClient` | `PendingInsert` uses a shared App Group file lock plus explicit suite synchronization; do not access its raw keys directly. |
+| `DictationRecord` (history) | SwiftData in the App Group container | Higher volume than `PendingInsert`; selected by the Phase 0 min-iOS investigation. |
+| `VocabularyEntry` | SwiftData in the App Group container | Indexed lookup needed for postprocessing. |
+| `VoiceFlowSettings` | App Group suite preferences (subset readable from extension) | Small, hot, atomic. |
 | Diagnostic ring buffer | Shared file in the App Group container | Local-only, no network telemetry. |
 
-The Keyboard Extension never opens the heavy store at launch; it only opens UserDefaults and lazy-loads the items it needs (last 5 history entries, vocabulary subset). See [performance-and-memory.md](performance-and-memory.md).
+The Keyboard Extension never opens the heavy store at launch; it only opens App Group suite preferences and lazy-loads the items it needs (last 5 history entries, vocabulary subset). See [performance-and-memory.md](performance-and-memory.md).
+
+The SwiftData decision is documented in [../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md). The `PendingInsert` contention verdict is documented in [../spikes/app-group-store-contention.md](../spikes/app-group-store-contention.md). If later SwiftData validation shows history/vocabulary access is unreliable for app/extension access patterns, switch history and vocabulary to shared SQLite before Phase 1.
+
+The extension-safe model definitions and `PendingInsert` shared-store client live in the local Swift package at [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/VoiceFlowShared).
 
 ---
 
@@ -143,16 +147,17 @@ struct VoiceFlowSettings: Codable {
 
 ## App Group concurrency protocol
 
-`PendingInsert` is the most contentious shared object. The protocol below eliminates torn reads despite cross-process `UserDefaults` not being instantaneously consistent.
+`PendingInsert` is the most contentious shared object. The protocol below eliminates torn reads despite cross-process suite preferences not being instantaneously consistent.
 
 ### Keys
 
 ```text
-UserDefaults(suiteName: "group.com.voiceflow.shared")
+SharedStoreClient(suiteName: "group.me.tissanr.VoiceFlow.shared")
 
   pendingInsert.payload      // Codable PendingInsert blob
   pendingInsert.generation   // monotonic Int, incremented on every write
   pendingInsert.consumedGen  // generation last consumed by the keyboard
+  Locks/pending-insert.lock  // App Group file lock guarding the read/write sequence
 ```
 
 ### Rules
@@ -160,6 +165,8 @@ UserDefaults(suiteName: "group.com.voiceflow.shared")
 - Only the **producing side** writes `pendingInsert.payload` and bumps `generation`:
   - Primary flow: Keyboard Extension produces.
   - Fallback flow: Containing app produces.
+- All producers and consumers must go through `SharedStoreClient`; direct raw key access is prohibited.
+- `SharedStoreClient` takes the App Group file lock and synchronizes the suite before reading and after mutating the `PendingInsert` keys.
 - The **consuming side** is always the Keyboard Extension at insert time. It only reads when `generation > consumedGen`.
 - After successful insert, the keyboard sets `consumedGen = generation` and writes `consumedAt` into the payload.
 - TTL: payloads with `createdAt` older than 10 minutes are considered stale and ignored.
@@ -169,6 +176,7 @@ UserDefaults(suiteName: "group.com.voiceflow.shared")
 
 - If `payload` decode fails: treat as `sharedStoreUnavailable`, surface error in keyboard UI, keep raw text in history if available.
 - If the keyboard is terminated mid-insert: `consumedGen` is not bumped; on next launch the keyboard sees `generation > consumedGen` and offers Insert again.
+- If a newer generation appears after the keyboard has read an older pending insert, `consumePendingInsert(generation:)` must refuse to tombstone the newer generation.
 - If the App Group is misconfigured (entitlement missing): keyboard enters `KeyboardState.noSharedAccess` and shows a setup hint.
 
 ---
@@ -199,4 +207,4 @@ UserDefaults(suiteName: "group.com.voiceflow.shared")
 
 - `generation` is strictly monotonic across both producers; attempts to write a non-increasing generation must fail loudly in debug builds.
 - A `PendingInsert` past `expiresAt` must never be inserted, even if `generation > consumedGen`.
-- Concurrent reads from the keyboard during a write from either producer must always see *either* the old payload or the new one, never a mixed state. Validated under contention in the Phase 0 spike.
+- Concurrent reads from the keyboard during a write from either producer must always see *either* the old payload or the new one, never a mixed state. Validated under contention in [../spikes/app-group-store-contention.md](../spikes/app-group-store-contention.md).
