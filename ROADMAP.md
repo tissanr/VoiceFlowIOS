@@ -20,7 +20,7 @@ Start here to see where the project is. The table is intentionally split by subp
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.5 In-keyboard recording spike | 🟨 Awaiting review / blocked | Harness exists; manual-device memory, latency, and stability measurements are deferred. Primary-flow viability remains unproven until a physical-device pass resumes. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.6 Remaining platform spikes | 🟧 In progress | Speech locale and crash-reporting verdicts are done; Open Access behavior, insert, context, and audio interruption verdicts still pending. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.7 Privacy / App Review / onboarding drafts | 🟨 Awaiting review / blocked | Privacy nutrition label, App Review narrative, onboarding direction, and permission-string direction are drafted; human review pending. |
-| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.8 Build + CI baseline | 🟧 In progress | GitHub Actions Swift workflow added; command path validation pending because the Swift package lives under `VoiceFlow/VoiceFlowShared`. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.8 Build + CI baseline | 🟩 Done | GitHub Actions Swift workflow runs from `VoiceFlow/VoiceFlowShared`; local SwiftPM build and unit tests pass from that package path. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.1 Keyboard UI state shell | 🟥 Not started | Build Compact, Recording, Transcribing, Reviewing, Pending, and InsertUnavailable states after Phase 0 sign-off. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.2 Primary in-keyboard dictation flow | 🟥 Not started | Requires Phase 0 in-keyboard recording verdict. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.3 Fallback containing-app handoff flow | 🟥 Not started | Requires Phase 0 handoff and App Group assumptions to stay valid. |
@@ -64,7 +64,7 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
 | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v2) | 🟥 Not started (dictation locale defaults clarified) |
 | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v3) | 🟨 Awaiting review (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written) |
-| [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v2) | 🟧 In progress (GitHub Actions Swift workflow added; command path validation pending) |
+| [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v3) | 🟧 In progress (GitHub Actions Swift package workflow path fixed; Xcode app build CI pending) |
 | [testing](docs/specs/testing.md) | Phase 0 spike tests, required iOS test versions, MVP acceptance tests, Phase 4 regression matrix | Accepted (v2) | 🟧 In progress (`VoiceFlowShared` tests and App Group contention spike harness exist) |
 
 **Status legend:** 🟥 Not started · 🟧 In progress · 🟨 Awaiting review · 🟩 Done · ⬛ Superseded

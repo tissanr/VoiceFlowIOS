@@ -1,7 +1,7 @@
 # Spec: Build & CI
 
-> **Spec status:** Accepted (v2)
-> **Implementation status:** In progress (GitHub Actions Swift workflow added; command path validation pending)
+> **Spec status:** Accepted (v3)
+> **Implementation status:** In progress (GitHub Actions Swift package workflow path fixed; Xcode app build CI pending)
 > **Last updated:** 2026-05-15
 > **Owners:** iOS
 
@@ -54,7 +54,9 @@ xcodebuild \
 | Phase 4 | Performance budgets (latency / memory smoke tests) required to pass. |
 | Phase 6 | Release pipeline (fastlane → TestFlight → App Store Connect). |
 
-Default CI host: GitHub Actions. A Swift workflow exists at [../../.github/workflows/swift.yml](../../.github/workflows/swift.yml); validate the command paths before treating CI as complete because the Swift package currently lives under `VoiceFlow/VoiceFlowShared`.
+Default CI host: GitHub Actions. A Swift package workflow exists at [../../.github/workflows/swift.yml](../../.github/workflows/swift.yml) and runs from `VoiceFlow/VoiceFlowShared`, where the Swift package currently lives.
+
+The current workflow validates the shared package only. Full Xcode app / keyboard-extension CI remains pending.
 
 ---
 
