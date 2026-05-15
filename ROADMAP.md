@@ -1,6 +1,6 @@
 # VoiceFlow iOS — Roadmap
 
-> **Last updated:** 2026-05-05
+> **Last updated:** 2026-05-15
 > **Purpose:** Index of specifications, implementation status, and phase plan. The detailed product spec lives in [`docs/specs/`](docs/specs/) — start there for any deep dive.
 
 ---
@@ -17,9 +17,10 @@ Start here to see where the project is. The table is intentionally split by subp
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.2 App Group + Open Access scaffold | 🟩 Done | App and keyboard entitlements are wired; keyboard `RequestsOpenAccess = true`. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.3 Minimum iOS baseline | 🟩 Done | iOS 17.0 selected in [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md) and applied to the project. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.4 Shared package + `PendingInsert` store | 🟩 Done | `VoiceFlowShared` model package and generation-counter `SharedStoreClient` exist; App Group contention spike passed. |
-| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.5 In-keyboard recording spike | 🟧 In progress | Harness exists; real-device memory, latency, and stability verdict still pending. |
-| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.6 Remaining platform spikes | 🟥 Not started | Open Access behavior, insert, context, audio interruption, speech locale, and crash-reporting verdicts still pending. |
-| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.7 Privacy / App Review / onboarding drafts | 🟥 Not started | Privacy nutrition label, App Review narrative, and onboarding copy still pending. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.5 In-keyboard recording spike | 🟨 Awaiting review / blocked | Harness exists; manual-device memory, latency, and stability measurements are deferred. Primary-flow viability remains unproven until a physical-device pass resumes. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.6 Remaining platform spikes | 🟧 In progress | Speech locale and crash-reporting verdicts are done; Open Access behavior, insert, context, and audio interruption verdicts still pending. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.7 Privacy / App Review / onboarding drafts | 🟨 Awaiting review / blocked | Privacy nutrition label, App Review narrative, onboarding direction, and permission-string direction are drafted; human review pending. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.8 Build + CI baseline | 🟩 Done | GitHub Actions Swift workflow runs from `VoiceFlow/VoiceFlowShared`; local SwiftPM build and unit tests pass from that package path. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.1 Keyboard UI state shell | 🟥 Not started | Build Compact, Recording, Transcribing, Reviewing, Pending, and InsertUnavailable states after Phase 0 sign-off. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.2 Primary in-keyboard dictation flow | 🟥 Not started | Requires Phase 0 in-keyboard recording verdict. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.3 Fallback containing-app handoff flow | 🟥 Not started | Requires Phase 0 handoff and App Group assumptions to stay valid. |
@@ -58,13 +59,13 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟧 In progress (shared model package wired; app and keyboard implementations pending) |
 | [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v2) | 🟧 In progress (`PendingInsert` shared-store handoff verified under contention; SwiftData history/vocabulary store pending) |
-| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v1) | 🟥 Not started |
+| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v2) | 🟧 In progress (Apple Speech locale / on-device strategy evaluated; implementation pending) |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟥 Not started |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
-| [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v1) | 🟥 Not started |
-| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v1) | 🟧 In progress (`RequestsOpenAccess` enabled; narrative pending) |
-| [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v1) | 🟥 Not started (manual local builds work) |
-| [testing](docs/specs/testing.md) | Phase 0 spike tests, MVP acceptance tests, Phase 4 regression matrix | Accepted (v1) | 🟧 In progress (`VoiceFlowShared` tests and App Group contention spike harness exist) |
+| [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v2) | 🟥 Not started (dictation locale defaults clarified) |
+| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v3) | 🟨 Awaiting review (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written) |
+| [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v3) | 🟧 In progress (GitHub Actions Swift package workflow path fixed; Xcode app build CI pending) |
+| [testing](docs/specs/testing.md) | Phase 0 spike tests, required iOS test versions, MVP acceptance tests, Phase 4 regression matrix | Accepted (v2) | 🟧 In progress (`VoiceFlowShared` tests and App Group contention spike harness exist) |
 
 **Status legend:** 🟥 Not started · 🟧 In progress · 🟨 Awaiting review · 🟩 Done · ⬛ Superseded
 
@@ -88,21 +89,21 @@ Scaffold hardening (immediate, low-risk):
 
 Spikes (each must produce a written verdict):
 
-- **In-keyboard recording** — microphone + `SFSpeechRecognizer` inside the Keyboard Extension on the chosen iOS baseline; measure peak memory, latency, stability over 5 min of repeated 10 s dictations. Harness implemented; real-device verdict pending. See [`docs/spikes/in-keyboard-recording.md`](docs/spikes/in-keyboard-recording.md). (See [performance-and-memory](docs/specs/performance-and-memory.md), [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md).)
+- **In-keyboard recording** — microphone + `SFSpeechRecognizer` inside the Keyboard Extension on the required iOS test versions from [`docs/specs/testing.md`](docs/specs/testing.md); measure peak memory, latency, stability over 5 min of repeated 10 s dictations. Harness implemented; manual-device measurements deferred. See [`docs/spikes/in-keyboard-recording.md`](docs/spikes/in-keyboard-recording.md). (See [performance-and-memory](docs/specs/performance-and-memory.md), [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md).)
 - **Open Access** — confirm `openURL` and microphone-in-extension behavior with and without Open Access. Verdict: feature matrix. (See [privacy-and-app-review](docs/specs/privacy-and-app-review.md).)
 - **App Group store** — `SharedStoreClient` with the generation-counter protocol is implemented for `PendingInsert`; cross-process contention spike passed with file-lock + synchronized suite access. **Done. Verdict:** viable for Phase 1 if all app/extension code uses `SharedStoreClient`; direct raw key access is prohibited. See [`docs/spikes/app-group-store-contention.md`](docs/spikes/app-group-store-contention.md).
 - **Insert** — insert in Notes, Mail, Messages, Safari, plus a known masked field. (See [keyboard-and-insert](docs/specs/keyboard-and-insert.md).)
 - **Context** — read context before / after cursor; verify auto-capitalization and spacing logic.
 - **Audio** — interruption tests (call, Siri, Focus, headphone unplug) for both flows.
-- **Speech** — Apple Speech in German, English, and mixed; on-device availability per locale.
+- **Speech** — **Done. Verdict:** use `SFSpeechRecognizer` for MVP; German defaults to `de-DE`, English defaults to `en-US`, Auto starts from `Locale.current`, and on-device support is runtime-gated per locale. See [`docs/spikes/apple-speech-locale-availability.md`](docs/spikes/apple-speech-locale-availability.md).
 - **Min-iOS investigation** — one-page comparison of iOS 17 / 18 / 26 covering Speech APIs, on-device support, SwiftData stability, audio session APIs, Keyboard Extension capabilities. Pick the lowest version with a meaningful simplicity win. **Done:** iOS 17.0 selected; see [`docs/spikes/min-ios-investigation.md`](docs/spikes/min-ios-investigation.md).
-- **Crash reporting** — decide MetricKit vs. third-party. (See [privacy-and-app-review](docs/specs/privacy-and-app-review.md).)
+- **Crash reporting** — **Done. Verdict:** use MetricKit first; defer third-party crash SDKs unless TestFlight proves MetricKit + local breadcrumbs insufficient. See [`docs/spikes/crash-reporting.md`](docs/spikes/crash-reporting.md).
 
 Drafts:
 
-- Privacy nutrition label.
-- App Review narrative.
-- Onboarding copy (Flow A wording, Open Access trade-off).
+- Privacy nutrition label. **Drafted; human review pending.** See [`docs/spikes/privacy-app-review-onboarding-draft.md`](docs/spikes/privacy-app-review-onboarding-draft.md).
+- App Review narrative. **Drafted; human review pending.** See [`docs/spikes/privacy-app-review-onboarding-draft.md`](docs/spikes/privacy-app-review-onboarding-draft.md).
+- Onboarding copy (Flow A wording, Open Access trade-off). **Drafted; human review pending.** See [`docs/spikes/privacy-app-review-onboarding-draft.md`](docs/spikes/privacy-app-review-onboarding-draft.md).
 
 **Exit criteria:** primary-flow viability decided with evidence; Open Access posture re-confirmed (default: optional with fallback); min-iOS decided; entitlements wired and verified end-to-end; privacy narrative + onboarding copy written; all former Open Decisions verified against spike results (see Resolved Decisions below).
 
@@ -229,6 +230,8 @@ Drafts:
 | Which App Group store is most robust? | Locked, synchronized suite preferences for `PendingInsert` and small state; SwiftData in the App Group container for history and vocabulary. Generation-counter protocol mandatory. | [data-and-storage](docs/specs/data-and-storage.md), [min-iOS investigation](docs/spikes/min-ios-investigation.md), [App Group store spike](docs/spikes/app-group-store-contention.md) |
 | MVP LLM: local, remote, or interface only? | Interface + local rules in MVP. Remote LLM gated on a separate explicit privacy review. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) |
 | Minimum iOS version? | iOS 17.0. | [min-iOS investigation](docs/spikes/min-ios-investigation.md) |
+| Crash reporting? | MetricKit first for MVP diagnostics, supplemented by local App Group breadcrumbs; third-party crash SDKs deferred unless TestFlight proves the first-party path insufficient. | [crash-reporting spike](docs/spikes/crash-reporting.md) |
+| Speech recognition engine? | `SFSpeechRecognizer` for MVP; on-device support checked per locale at runtime; iOS 26 transcriber APIs and Whisper remain post-MVP evaluation paths. | [Apple Speech locale spike](docs/spikes/apple-speech-locale-availability.md) |
 | Launch languages? | German + English; mixed German / English dictation supported. | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) |
 | Audio temporarily storable for debugging? | Off by default; opt-in only. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) |
 | Keyboard-extension history size? | Last 5 entries loaded eagerly; full history only via the containing app. | [performance-and-memory](docs/specs/performance-and-memory.md) |

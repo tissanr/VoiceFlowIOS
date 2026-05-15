@@ -1,8 +1,8 @@
 # Spec: Privacy & App Review
 
-> **Spec status:** Accepted (v1)
-> **Implementation status:** In progress (`RequestsOpenAccess` enabled; narrative drafted later in Phase 0)
-> **Last updated:** 2026-04-28
+> **Spec status:** Accepted (v3)
+> **Implementation status:** In progress (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written, human review pending)
+> **Last updated:** 2026-05-15
 > **Owners:** product + iOS
 
 Permissions, privacy posture, telemetry, and the App Store Review narrative. App-Review-sensitive — read before changing user-facing wording.
@@ -20,6 +20,8 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 ### Permission copy
 
 `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` strings are **App-Review-sensitive**. Wording must match the actual behavior described in this spec; reviewers compare them against runtime usage. Do not tweak in passing.
+
+Draft permission-string direction lives in [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). It is not final shipping copy until human review signs it off.
 
 ---
 
@@ -44,16 +46,19 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 
 ## Telemetry & crash reporting
 
-- **Crash reporting** is required from Phase 0. Default choice: Apple's **MetricKit** (privacy-friendly, no network). Third-party (Sentry, Firebase Crashlytics) requires an explicit Phase 0 decision and a privacy-policy update.
-  - Rationale for MetricKit default: the keyboard extension cannot reliably make network calls without Open Access.
+- **Crash reporting decision:** Apple's **MetricKit** is selected for MVP diagnostics. Third-party crash SDKs (Sentry, Firebase Crashlytics, or similar) are deferred and require a new privacy review plus privacy-policy / nutrition-label updates.
+  - Rationale: MetricKit is first-party, avoids silent network telemetry, and does not require a network SDK inside the Keyboard Extension.
+  - Decision record: [../spikes/crash-reporting.md](../spikes/crash-reporting.md).
 - **Diagnostic events** are stored in a local-only ring buffer in the App Group container and are viewable in Settings → Diagnostics.
-- **Extension crash visibility** — the containing app inspects MetricKit reports on launch and surfaces a "Last keyboard error" hint in onboarding / settings.
+- **Extension crash visibility** — the containing app inspects MetricKit reports on launch and combines them with extension lifecycle breadcrumbs from the local ring buffer to surface a "Last keyboard error" hint in onboarding / settings.
 
 ---
 
 ## App Review narrative
 
 Custom keyboards combined with microphone access and (optionally) network-bound LLMs face elevated App Review scrutiny. This narrative is drafted in **Phase 0** and refined throughout. App reviewers will ask each of these questions; the answers must be ready before submission.
+
+Phase 0 draft package: [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). Status: drafted; human review required.
 
 - **Why a custom keyboard?** Apple's system dictation does not allow VoiceFlow to format, correct, or apply user vocabulary before insertion. VoiceFlow's value is post-recognition processing — that requires our own surface.
 - **Why microphone?** Recording is owned by VoiceFlow; we do not share or upload audio.
@@ -63,11 +68,12 @@ Custom keyboards combined with microphone access and (optionally) network-bound 
 
 ### Privacy nutrition label
 
-Drafted in Phase 0, finalized in Phase 6. Categories:
+Drafted in Phase 0, finalized in Phase 6. Draft details live in [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). Categories:
 
 - **Microphone** — linked to user (used for recording).
 - **Audio Data** — not collected (audio is processed in-memory and never persisted by default).
 - **User Content (text)** — linked to user, processed locally only unless remote LLM is explicitly enabled.
+- **Diagnostics** — collected for app functionality / reliability, not tracking; MetricKit plus local breadcrumbs.
 
 ---
 
@@ -75,4 +81,5 @@ Drafted in Phase 0, finalized in Phase 6. Categories:
 
 - The dual-flow design that justifies the Open Access posture: [architecture.md](architecture.md)
 - Permission strings and localization: [accessibility-and-localization.md](accessibility-and-localization.md)
-- Onboarding copy lives with [architecture.md](architecture.md) → Flow A
+- Onboarding draft copy: [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md)
+- Flow A structure: [architecture.md](architecture.md) → Flow A
