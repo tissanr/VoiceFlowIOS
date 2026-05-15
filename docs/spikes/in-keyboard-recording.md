@@ -1,8 +1,8 @@
 # Phase 0 Spike: In-keyboard Recording
 
-> **Verdict:** Pending real-device run.
-> **Date:** 2026-04-29
-> **Status:** Harness implemented; measurements not yet collected.
+> **Verdict:** Deferred pending real-device run.
+> **Date:** 2026-05-15
+> **Status:** Harness implemented; manual-device measurements postponed.
 
 ## Question
 
@@ -37,14 +37,14 @@ Captured metrics:
 8. Repeat for 5 minutes of repeated 10-second dictations.
 9. Record the worst observed peak resident memory, latency numbers, transcript stability, and extension crashes/restarts.
 
-Required device matrix from `docs/specs/testing.md`:
+Required test-version matrix from `docs/specs/testing.md`:
 
-| Device | iOS | Peak RSS | Tap -> engine | Tap -> first buffer | Stop -> final | Stability |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| iPhone 12 | TBD | TBD | TBD | TBD | TBD | TBD |
-| iPhone 14 | TBD | TBD | TBD | TBD | TBD | TBD |
-| iPhone 15 | TBD | TBD | TBD | TBD | TBD | TBD |
-| iPhone 16 | TBD | TBD | TBD | TBD | TBD | TBD |
+| Tier | iOS | Environment | Peak RSS | Tap -> engine | Tap -> first buffer | Stop -> final | Stability |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| Minimum supported | iOS 17.x, latest available 17 patch preferred | Physical iPhone if available; otherwise close with TestFlight / borrowed-device pass before Phase 1 sign-off | TBD | TBD | TBD | TBD | TBD |
+| Current shipping | iOS 26.x, latest available patch | Physical iPhone | TBD | TBD | TBD | TBD | TBD |
+| Current simulator | iOS 26.4 or newer installed simulator runtime | iPhone simulator | Supporting evidence only | TBD | TBD | TBD | Supporting evidence only |
+| Intermediate compatibility | iOS 18.x, latest available patch | Physical device or simulator when available | TBD | TBD | TBD | TBD | TBD |
 
 ## Verdict Rules
 
@@ -55,6 +55,8 @@ Required device matrix from `docs/specs/testing.md`:
 ## Current Findings
 
 No real-device finding yet. Simulator runs are not sufficient for this spike because the question is keyboard-extension microphone entitlement, Open Access behavior, memory ceiling, and Speech stability on device.
+
+Manual-device testing was postponed on 2026-05-15. This keeps Phase 0 moving on non-device evaluations, but the primary keyboard recording flow remains an unproven risk until the physical-device pass is resumed.
 
 ## Follow-up
 

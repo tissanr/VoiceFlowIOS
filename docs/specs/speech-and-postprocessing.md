@@ -1,8 +1,8 @@
 # Spec: Speech & Postprocessing
 
-> **Spec status:** Accepted (v1)
-> **Implementation status:** Not started (Phase 0 pending)
-> **Last updated:** 2026-04-28
+> **Spec status:** Accepted (v2)
+> **Implementation status:** In progress (Apple Speech locale / on-device strategy evaluated; `SpeechEngine` implementation pending)
+> **Last updated:** 2026-05-15
 > **Owners:** iOS
 
 Audio session, speech recognition strategy, and the postprocessing pipeline that turns raw recognition into shippable text.
@@ -22,7 +22,7 @@ Audio session, speech recognition strategy, and the postprocessing pipeline that
 
 ## Speech engine
 
-VoiceFlow uses Apple's Speech framework first. Whisper / Core ML remains a later alternative if Apple Speech is insufficient for quality, offline availability, mixed-language dictation, or privacy.
+VoiceFlow uses Apple's Speech framework first. Whisper / Core ML remains a later alternative if Apple Speech is insufficient for quality, offline availability, mixed-language dictation, or privacy. The Phase 0 Speech verdict is documented in [../spikes/apple-speech-locale-availability.md](../spikes/apple-speech-locale-availability.md).
 
 ```swift
 protocol SpeechEngine {
@@ -42,6 +42,8 @@ protocol SpeechEngine {
 
 - Check `SFSpeechRecognizer.supportedLocales()` and `supportsOnDeviceRecognition` at runtime per locale.
 - If the user's locale lacks on-device support and the user has chosen "On-Device only," surface a clear "speech unavailable for this language" message — do not silently fall back to network.
+- Locale modes are `automatic`, `german`, and `english`. Explicit defaults are `de-DE` for German and `en-US` for English.
+- Mixed German / English dictation is a product goal, but the MVP must not assume one Apple Speech session handles both languages equally. Use postprocessing and vocabulary correction for common mixed-language cleanup.
 
 ---
 

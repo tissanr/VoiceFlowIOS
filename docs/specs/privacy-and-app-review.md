@@ -1,8 +1,8 @@
 # Spec: Privacy & App Review
 
-> **Spec status:** Accepted (v1)
-> **Implementation status:** In progress (`RequestsOpenAccess` enabled; narrative drafted later in Phase 0)
-> **Last updated:** 2026-04-28
+> **Spec status:** Accepted (v2)
+> **Implementation status:** In progress (`RequestsOpenAccess` enabled; MetricKit selected for MVP diagnostics; narrative drafted later in Phase 0)
+> **Last updated:** 2026-05-15
 > **Owners:** product + iOS
 
 Permissions, privacy posture, telemetry, and the App Store Review narrative. App-Review-sensitive — read before changing user-facing wording.
@@ -44,10 +44,11 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 
 ## Telemetry & crash reporting
 
-- **Crash reporting** is required from Phase 0. Default choice: Apple's **MetricKit** (privacy-friendly, no network). Third-party (Sentry, Firebase Crashlytics) requires an explicit Phase 0 decision and a privacy-policy update.
-  - Rationale for MetricKit default: the keyboard extension cannot reliably make network calls without Open Access.
+- **Crash reporting decision:** Apple's **MetricKit** is selected for MVP diagnostics. Third-party crash SDKs (Sentry, Firebase Crashlytics, or similar) are deferred and require a new privacy review plus privacy-policy / nutrition-label updates.
+  - Rationale: MetricKit is first-party, avoids silent network telemetry, and does not require a network SDK inside the Keyboard Extension.
+  - Decision record: [../spikes/crash-reporting.md](../spikes/crash-reporting.md).
 - **Diagnostic events** are stored in a local-only ring buffer in the App Group container and are viewable in Settings → Diagnostics.
-- **Extension crash visibility** — the containing app inspects MetricKit reports on launch and surfaces a "Last keyboard error" hint in onboarding / settings.
+- **Extension crash visibility** — the containing app inspects MetricKit reports on launch and combines them with extension lifecycle breadcrumbs from the local ring buffer to surface a "Last keyboard error" hint in onboarding / settings.
 
 ---
 

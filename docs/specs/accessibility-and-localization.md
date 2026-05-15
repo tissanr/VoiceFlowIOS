@@ -1,8 +1,8 @@
 # Spec: Accessibility & Localization
 
-> **Spec status:** Accepted (v1)
+> **Spec status:** Accepted (v2)
 > **Implementation status:** Not started (Phase 2 exit criteria)
-> **Last updated:** 2026-04-28
+> **Last updated:** 2026-05-15
 > **Owners:** iOS + product
 
 ---
@@ -34,6 +34,7 @@ A voice-first app with an inaccessible keyboard fails its own thesis. These are 
 
 - **German (de)** and **English (en)** for UI strings and dictation.
 - **Mixed German / English dictation** is a recognized recurring use case; the speech engine should not be forced into a single locale per session if the user has chosen Auto.
+- Dictation defaults: German uses `de-DE`; English uses `en-US`; Auto starts from `Locale.current` when supported. See [../spikes/apple-speech-locale-availability.md](../spikes/apple-speech-locale-availability.md).
 
 ### Implementation rules
 
