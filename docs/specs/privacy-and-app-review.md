@@ -1,7 +1,7 @@
 # Spec: Privacy & App Review
 
-> **Spec status:** Accepted (v2)
-> **Implementation status:** In progress (`RequestsOpenAccess` enabled; MetricKit selected for MVP diagnostics; narrative drafted later in Phase 0)
+> **Spec status:** Accepted (v3)
+> **Implementation status:** In progress (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written, human review pending)
 > **Last updated:** 2026-05-15
 > **Owners:** product + iOS
 
@@ -20,6 +20,8 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 ### Permission copy
 
 `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` strings are **App-Review-sensitive**. Wording must match the actual behavior described in this spec; reviewers compare them against runtime usage. Do not tweak in passing.
+
+Draft permission-string direction lives in [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). It is not final shipping copy until human review signs it off.
 
 ---
 
@@ -56,6 +58,8 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 
 Custom keyboards combined with microphone access and (optionally) network-bound LLMs face elevated App Review scrutiny. This narrative is drafted in **Phase 0** and refined throughout. App reviewers will ask each of these questions; the answers must be ready before submission.
 
+Phase 0 draft package: [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). Status: drafted; human review required.
+
 - **Why a custom keyboard?** Apple's system dictation does not allow VoiceFlow to format, correct, or apply user vocabulary before insertion. VoiceFlow's value is post-recognition processing — that requires our own surface.
 - **Why microphone?** Recording is owned by VoiceFlow; we do not share or upload audio.
 - **Why Open Access (when requested)?** To enable in-keyboard recording and avoid forcing users into the fallback flow. The dual-flow design exists specifically so users who decline Open Access still get a working product.
@@ -64,11 +68,12 @@ Custom keyboards combined with microphone access and (optionally) network-bound 
 
 ### Privacy nutrition label
 
-Drafted in Phase 0, finalized in Phase 6. Categories:
+Drafted in Phase 0, finalized in Phase 6. Draft details live in [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). Categories:
 
 - **Microphone** — linked to user (used for recording).
 - **Audio Data** — not collected (audio is processed in-memory and never persisted by default).
 - **User Content (text)** — linked to user, processed locally only unless remote LLM is explicitly enabled.
+- **Diagnostics** — collected for app functionality / reliability, not tracking; MetricKit plus local breadcrumbs.
 
 ---
 
@@ -76,4 +81,5 @@ Drafted in Phase 0, finalized in Phase 6. Categories:
 
 - The dual-flow design that justifies the Open Access posture: [architecture.md](architecture.md)
 - Permission strings and localization: [accessibility-and-localization.md](accessibility-and-localization.md)
-- Onboarding copy lives with [architecture.md](architecture.md) → Flow A
+- Onboarding draft copy: [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md)
+- Flow A structure: [architecture.md](architecture.md) → Flow A

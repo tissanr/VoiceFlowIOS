@@ -19,7 +19,7 @@ Start here to see where the project is. The table is intentionally split by subp
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.4 Shared package + `PendingInsert` store | 🟩 Done | `VoiceFlowShared` model package and generation-counter `SharedStoreClient` exist; App Group contention spike passed. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.5 In-keyboard recording spike | 🟨 Awaiting review / blocked | Harness exists; manual-device memory, latency, and stability measurements are deferred. Primary-flow viability remains unproven until a physical-device pass resumes. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.6 Remaining platform spikes | 🟧 In progress | Speech locale and crash-reporting verdicts are done; Open Access behavior, insert, context, and audio interruption verdicts still pending. |
-| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.7 Privacy / App Review / onboarding drafts | 🟥 Not started | Privacy nutrition label, App Review narrative, and onboarding copy still pending. |
+| Phase 0 — Foundation, Spikes, Privacy Narrative | 0.7 Privacy / App Review / onboarding drafts | 🟨 Awaiting review / blocked | Privacy nutrition label, App Review narrative, onboarding direction, and permission-string direction are drafted; human review pending. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.8 Build + CI baseline | 🟧 In progress | GitHub Actions Swift workflow added; command path validation pending because the Swift package lives under `VoiceFlow/VoiceFlowShared`. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.1 Keyboard UI state shell | 🟥 Not started | Build Compact, Recording, Transcribing, Reviewing, Pending, and InsertUnavailable states after Phase 0 sign-off. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.2 Primary in-keyboard dictation flow | 🟥 Not started | Requires Phase 0 in-keyboard recording verdict. |
@@ -63,7 +63,7 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟥 Not started |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
 | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v2) | 🟥 Not started (dictation locale defaults clarified) |
-| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v2) | 🟧 In progress (`RequestsOpenAccess` enabled; MetricKit selected; narrative pending) |
+| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v3) | 🟨 Awaiting review (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written) |
 | [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v2) | 🟧 In progress (GitHub Actions Swift workflow added; command path validation pending) |
 | [testing](docs/specs/testing.md) | Phase 0 spike tests, required iOS test versions, MVP acceptance tests, Phase 4 regression matrix | Accepted (v2) | 🟧 In progress (`VoiceFlowShared` tests and App Group contention spike harness exist) |
 
@@ -101,9 +101,9 @@ Spikes (each must produce a written verdict):
 
 Drafts:
 
-- Privacy nutrition label.
-- App Review narrative.
-- Onboarding copy (Flow A wording, Open Access trade-off).
+- Privacy nutrition label. **Drafted; human review pending.** See [`docs/spikes/privacy-app-review-onboarding-draft.md`](docs/spikes/privacy-app-review-onboarding-draft.md).
+- App Review narrative. **Drafted; human review pending.** See [`docs/spikes/privacy-app-review-onboarding-draft.md`](docs/spikes/privacy-app-review-onboarding-draft.md).
+- Onboarding copy (Flow A wording, Open Access trade-off). **Drafted; human review pending.** See [`docs/spikes/privacy-app-review-onboarding-draft.md`](docs/spikes/privacy-app-review-onboarding-draft.md).
 
 **Exit criteria:** primary-flow viability decided with evidence; Open Access posture re-confirmed (default: optional with fallback); min-iOS decided; entitlements wired and verified end-to-end; privacy narrative + onboarding copy written; all former Open Decisions verified against spike results (see Resolved Decisions below).
 
