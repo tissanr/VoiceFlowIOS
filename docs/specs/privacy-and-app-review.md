@@ -1,7 +1,7 @@
 # Spec: Privacy & App Review
 
 > **Spec status:** Accepted (v3)
-> **Implementation status:** In progress (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written, human review pending)
+> **Implementation status:** In progress (`RequestsOpenAccess` enabled; Open Access behavior harness wired; MetricKit selected; privacy / App Review / onboarding draft written, human review pending)
 > **Last updated:** 2026-05-15
 > **Owners:** product + iOS
 
@@ -30,6 +30,7 @@ Draft permission-string direction lives in [../spikes/privacy-app-review-onboard
 - **Posture:** optional with fallback. The MVP works without Open Access via the fallback flow — see [architecture.md](architecture.md).
 - **Enables:** in-keyboard recording, `openURL` from the keyboard, smoother App Group sync, network access (e.g., remote LLM if ever enabled).
 - **Phase 0 must produce** a written go/no-go on whether the microphone path inside the keyboard is reliable enough on the chosen iOS baseline to be the primary flow.
+- Open Access behavior spike: [../spikes/open-access-behavior.md](../spikes/open-access-behavior.md).
 
 ---
 

@@ -101,7 +101,7 @@ final class KeyboardViewController: UIInputViewController {
         recordButton.setTitle("Local Record", for: .normal)
         recordButton.addTarget(self, action: #selector(toggleSpikeRecording), for: .touchUpInside)
 
-        openAppButton.setTitle("🎤 Open VoiceFlow", for: .normal)
+        openAppButton.setTitle("Open VoiceFlow", for: .normal)
         openAppButton.titleLabel?.font = .boldSystemFont(ofSize: 16)
         openAppButton.addTarget(self, action: #selector(openMainApp), for: .touchUpInside)
 
@@ -134,10 +134,15 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func openMainApp() {
         let url = URL(string: "voiceflow://record")!
+        statusLabel.text = "Opening VoiceFlow..."
 
-        extensionContext?.open(url, completionHandler: { success in
-            print("Deep link success: \(success)")
-        })
+        extensionContext?.open(url) { [weak statusLabel] success in
+            DispatchQueue.main.async {
+                statusLabel?.text = success
+                    ? "Open URL reported success"
+                    : "Open URL reported failure"
+            }
+        }
     }
 
     @objc private func toggleSpikeRecording() {

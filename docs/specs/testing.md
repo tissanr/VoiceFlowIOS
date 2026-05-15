@@ -35,7 +35,7 @@ Minimum hardware requirement before Phase 1 sign-off: **one physical iPhone** ru
 - **Apple Speech** in German, English, mixed German / English.
 - **In-keyboard recording** on the required iOS test versions above — peak memory + tap-to-record latency under [performance budgets](performance-and-memory.md). Physical device results are required for the verdict; simulator runs are supporting evidence only.
 - **App Group concurrency** under contention — interleaved writes from app + extension; verify the generation-counter protocol from [data-and-storage.md](data-and-storage.md). **Done for `PendingInsert`:** [../spikes/app-group-store-contention.md](../spikes/app-group-store-contention.md).
-- **`openURL` from extension** with and without Open Access.
+- **`openURL` from extension** with and without Open Access. Harness is documented in [../spikes/open-access-behavior.md](../spikes/open-access-behavior.md); manual matrix is still pending.
 
 ---
 
