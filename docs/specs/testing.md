@@ -28,7 +28,7 @@ Minimum hardware requirement before Phase 1 sign-off: **one physical iPhone** ru
 
 ## Phase 0 tests (spikes — produce written verdicts)
 
-- Insert test text in: Apple Notes, Mail, Messages, Safari, a known masked field (e.g., credit-card field).
+- Insert test text in: Apple Notes, Mail, Messages, Safari, a known masked field (e.g., credit-card field). Pure context-planning rules are covered by [../spikes/insert-and-context.md](../spikes/insert-and-context.md); host-app insertion validation is still pending.
 - Behavior in **Secure Field** and **Phone Pad**.
 - Behavior after **Extension cold restart**.
 - Behavior **without App Group access** (entitlement misconfigured) — `KeyboardState.noSharedAccess` shown.

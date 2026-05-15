@@ -96,7 +96,7 @@ final class KeyboardViewController: UIInputViewController {
         metricsLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         metricsLabel.numberOfLines = 5
         metricsLabel.textColor = .secondaryLabel
-        metricsLabel.text = "App Group ID: group.com.voiceflow.shared\nURL: voiceflow://"
+        metricsLabel.text = "App Group ID: \(VoiceFlowConstants.appGroupIdentifier)\nURL: voiceflow://"
 
         recordButton.setTitle("Local Record", for: .normal)
         recordButton.addTarget(self, action: #selector(toggleSpikeRecording), for: .touchUpInside)
@@ -134,18 +134,7 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func openMainApp() {
         let url = URL(string: "voiceflow://record")!
-        
-        // Extension context open URL hack
-        var responder: UIResponder? = self
-        while responder != nil {
-            if let application = responder as? UIApplication {
-                application.perform(#selector(UIApplication.open(_:options:completionHandler:)), with: url, with: nil, with: nil)
-                return
-            }
-            responder = responder?.next
-        }
-        
-        // Fallback using extensionContext (requires Full Access usually)
+
         extensionContext?.open(url, completionHandler: { success in
             print("Deep link success: \(success)")
         })

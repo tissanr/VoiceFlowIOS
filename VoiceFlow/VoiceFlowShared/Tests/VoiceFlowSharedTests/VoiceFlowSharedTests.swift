@@ -2,6 +2,91 @@ import XCTest
 @testable import VoiceFlowShared
 
 final class VoiceFlowSharedTests: XCTestCase {
+    func testInsertContextPlansLeadingSpaceInMiddleOfSentence() {
+        let planned = InsertContextPlanner.plan(
+            text: "next words",
+            context: InsertContext(beforeInput: "Existing text", afterInput: nil)
+        )
+
+        XCTAssertEqual(planned.text, " next words")
+        XCTAssertFalse(planned.isSentenceStart)
+        XCTAssertTrue(planned.addedLeadingSpace)
+    }
+
+    func testInsertContextDoesNotAddDuplicateLeadingSpace() {
+        let planned = InsertContextPlanner.plan(
+            text: "next words",
+            context: InsertContext(beforeInput: "Existing text ", afterInput: nil)
+        )
+
+        XCTAssertEqual(planned.text, "next words")
+        XCTAssertFalse(planned.addedLeadingSpace)
+    }
+
+    func testInsertContextCapitalizesAtEmptyContext() {
+        let planned = InsertContextPlanner.plan(
+            text: "hello world",
+            context: InsertContext(beforeInput: "", afterInput: nil)
+        )
+
+        XCTAssertEqual(planned.text, "Hello world")
+        XCTAssertTrue(planned.isSentenceStart)
+        XCTAssertTrue(planned.capitalizedFirstLetter)
+    }
+
+    func testInsertContextCapitalizesAfterSentenceBoundary() {
+        let planned = InsertContextPlanner.plan(
+            text: "hello again",
+            context: InsertContext(beforeInput: "Previous sentence. ", afterInput: nil)
+        )
+
+        XCTAssertEqual(planned.text, "Hello again")
+        XCTAssertTrue(planned.isSentenceStart)
+        XCTAssertTrue(planned.capitalizedFirstLetter)
+        XCTAssertFalse(planned.addedLeadingSpace)
+    }
+
+    func testInsertContextTreatsNewlineAsSentenceBoundary() {
+        let planned = InsertContextPlanner.plan(
+            text: "new paragraph",
+            context: InsertContext(beforeInput: "Title\n", afterInput: nil)
+        )
+
+        XCTAssertEqual(planned.text, "New paragraph")
+        XCTAssertTrue(planned.isSentenceStart)
+    }
+
+    func testInsertContextRemovesDuplicateTerminalPunctuationBeforeAfterContext() {
+        let planned = InsertContextPlanner.plan(
+            text: "done.",
+            context: InsertContext(beforeInput: "Task is", afterInput: ". Next")
+        )
+
+        XCTAssertEqual(planned.text, " done")
+        XCTAssertTrue(planned.addedLeadingSpace)
+        XCTAssertTrue(planned.removedDuplicateTerminalPunctuation)
+    }
+
+    func testInsertContextDoesNotAddSpaceBeforePunctuationInsert() {
+        let planned = InsertContextPlanner.plan(
+            text: ", actually",
+            context: InsertContext(beforeInput: "Wait", afterInput: nil)
+        )
+
+        XCTAssertEqual(planned.text, ", actually")
+        XCTAssertFalse(planned.addedLeadingSpace)
+    }
+
+    func testInsertContextTrimsDictationTextBeforePlanning() {
+        let planned = InsertContextPlanner.plan(
+            text: "  hello world  ",
+            context: InsertContext(beforeInput: "Start.", afterInput: nil)
+        )
+
+        XCTAssertEqual(planned.text, "Hello world")
+        XCTAssertTrue(planned.capitalizedFirstLetter)
+    }
+
     func testPendingInsertDefaultExpiryUsesTenMinuteTTL() {
         let createdAt = Date(timeIntervalSince1970: 100)
         let insert = PendingInsert(

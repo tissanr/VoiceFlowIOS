@@ -1,8 +1,8 @@
 # Spec: Keyboard & Insert
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** Not started (Phase 0 pending)
-> **Last updated:** 2026-04-28
+> **Implementation status:** In progress (shared insert-context planning rules tested; host-app insertion pending)
+> **Last updated:** 2026-05-15
 > **Owners:** iOS
 
 Keyboard UI states, insert path, and the boring edge cases that break custom keyboards.
@@ -23,6 +23,8 @@ The Next-Keyboard globe is mandatory per Apple HIG; it must be reachable in ever
 ## Insert path
 
 The only primary insert path is `UITextDocumentProxy.insertText(...)`.
+
+Phase 0 context-rule coverage lives in [../spikes/insert-and-context.md](../spikes/insert-and-context.md). Host-app insertion validation is still pending.
 
 ### Before insert
 
