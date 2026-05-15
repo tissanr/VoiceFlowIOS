@@ -10,7 +10,7 @@ import Foundation
 public final class SharedStore {
     public static let shared = SharedStore()
     
-    private let groupID = "group.com.voiceflow.shared"
+    private let groupID = "group.me.tissanr.VoiceFlow.shared"
     private let defaults: UserDefaults?
     
     private enum Keys {
