@@ -26,7 +26,8 @@ protocol KeyboardRecordingSpikeDelegate: AnyObject {
     func keyboardRecordingSpikeDidUpdate(_ snapshot: KeyboardRecordingSpikeSnapshot)
 }
 
-final class KeyboardRecordingSpike {
+@MainActor
+final class KeyboardRecordingSpike: @unchecked Sendable {
     weak var delegate: KeyboardRecordingSpikeDelegate?
 
     private let audioEngine = AVAudioEngine()
@@ -204,7 +205,7 @@ final class KeyboardRecordingSpike {
         recognitionRequest = request
         speechActive = true
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.handleRecognition(result: result, error: error)
             }
         }
@@ -228,8 +229,8 @@ final class KeyboardRecordingSpike {
         }
 
         inputNode.installTap(onBus: 0, bufferSize: 1_024, format: nil) { [weak self] buffer, _ in
-            self?.recognitionRequest?.append(buffer)
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                self?.recognitionRequest?.append(buffer)
                 self?.observeAudioBuffer()
             }
         }
@@ -273,7 +274,7 @@ final class KeyboardRecordingSpike {
     private func startMemorySampling() {
         memoryTimer?.invalidate()
         memoryTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 self?.sampleMemory()
             }
         }

@@ -1,8 +1,8 @@
 # Spec: Testing
 
 > **Spec status:** Accepted (v2)
-> **Implementation status:** In progress (`VoiceFlowShared` unit tests and App Group contention spike harness exist)
-> **Last updated:** 2026-05-15
+> **Implementation status:** In progress (`VoiceFlowShared` unit tests and App Group contention spike harness exist; old-device recording pass skipped)
+> **Last updated:** 2026-05-19
 > **Owners:** iOS
 
 Test plan for the spike phase, the MVP, and recurring regression checks.
@@ -15,14 +15,14 @@ VoiceFlow targets **iOS 17.0+**. Testing is version-first rather than phone-mode
 
 | Tier | iOS version | Environment | Required for | Notes |
 | --- | --- | --- | --- | --- |
-| Minimum supported | iOS 17.x, latest available 17 patch preferred | Physical iPhone if available; otherwise TestFlight / borrowed-device pass before Phase 1 sign-off | Deployment-target compatibility, `SFSpeechRecognizer`, App Group access, keyboard lifecycle | This is the baseline selected by [../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md). Do not claim iOS 17 compatibility from an iOS 26 simulator run alone. |
+| Minimum supported | iOS 17.x, latest available 17 patch preferred | Simulator for Phase 0; physical coverage later if available through TestFlight or owned hardware | Deployment-target compatibility, `SFSpeechRecognizer`, App Group access, keyboard lifecycle | This is the baseline selected by [../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md). Do not claim iOS 17 compatibility from an iOS 26 simulator run alone. |
 | Current shipping | iOS 26.x, latest available patch | Physical iPhone for microphone / Open Access / memory; simulator for repeatable UI and unit tests | Current user experience and App Review-relevant behavior | As of 2026-05-15, the local machine has iOS 26.4 simulators installed. |
 | Current simulator | iOS 26.4 or newer installed simulator runtime | iPhone simulator, preferably a small-screen and large-screen profile | CI, keyboard UI, onboarding UI, App Group handoff, insert/context logic in test hosts | Simulator results are useful for automation but not authoritative for microphone-in-keyboard, Open Access, extension memory ceiling, or real app insertion. |
 | Intermediate compatibility | iOS 18.x, latest available patch | Physical device or simulator when available | Regression sweep before TestFlight / release | Useful because many active devices may sit between the minimum baseline and current iOS. Not a Phase 0 blocker if unavailable locally. |
 
-Manual-device coverage is **deferred as of 2026-05-15**. Continue with simulator-safe implementation work and non-device evaluations, but do not claim the primary keyboard recording flow is production-viable until at least one physical iPhone pass is completed.
+Old-device / borrowed-device recording coverage is **skipped as of 2026-05-19**. Continue with simulator-safe implementation work and available-device evaluations, but do not claim the primary keyboard recording flow is production-viable until physical hardware data exists.
 
-Minimum hardware requirement before Phase 1 sign-off: **one physical iPhone** running either iOS 17.x or current iOS 26.x. If only one physical version is available, record the missing version as a testing gap and close it with TestFlight or a borrowed device before release readiness.
+Before release readiness, record whatever physical-device coverage is available and document missing iOS versions as accepted gaps or TestFlight follow-up. Do not block Phase 1 solely on finding borrowed old devices.
 
 ---
 
@@ -33,7 +33,7 @@ Minimum hardware requirement before Phase 1 sign-off: **one physical iPhone** ru
 - Behavior after **Extension cold restart**.
 - Behavior **without App Group access** (entitlement misconfigured) — `KeyboardState.noSharedAccess` shown.
 - **Apple Speech** in German, English, mixed German / English.
-- **In-keyboard recording** on the required iOS test versions above — peak memory + tap-to-record latency under [performance budgets](performance-and-memory.md). Physical device results are required for the verdict; simulator runs are supporting evidence only.
+- **In-keyboard recording** on available hardware — peak memory + tap-to-record latency under [performance budgets](performance-and-memory.md). The old-device / borrowed-device Phase 0 pass is skipped; simulator runs remain supporting evidence only.
 - **App Group concurrency** under contention — interleaved writes from app + extension; verify the generation-counter protocol from [data-and-storage.md](data-and-storage.md). **Done for `PendingInsert`:** [../spikes/app-group-store-contention.md](../spikes/app-group-store-contention.md).
 - **`openURL` from extension** with and without Open Access. Harness is documented in [../spikes/open-access-behavior.md](../spikes/open-access-behavior.md); manual matrix is postponed until after [../spikes/audio-interruption.md](../spikes/audio-interruption.md).
 - **Audio interruptions** during recording — call, Siri, Focus / system alert, headphone or Bluetooth route change, keyboard dismissal. Harness is documented in [../spikes/audio-interruption.md](../spikes/audio-interruption.md); physical-device matrix is still pending.

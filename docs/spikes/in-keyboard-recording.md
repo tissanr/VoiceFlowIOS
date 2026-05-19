@@ -1,8 +1,8 @@
 # Phase 0 Spike: In-keyboard Recording
 
-> **Verdict:** Deferred pending real-device run.
-> **Date:** 2026-05-15
-> **Status:** Harness implemented; manual-device measurements postponed.
+> **Verdict:** Hardware pass skipped by product decision; proceed with fallback-first risk mitigation.
+> **Date:** 2026-05-19
+> **Status:** Harness implemented; old-device / borrowed-device measurements skipped.
 
 ## Question
 
@@ -41,7 +41,7 @@ Required test-version matrix from `docs/specs/testing.md`:
 
 | Tier | iOS | Environment | Peak RSS | Tap -> engine | Tap -> first buffer | Stop -> final | Stability |
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| Minimum supported | iOS 17.x, latest available 17 patch preferred | Physical iPhone if available; otherwise close with TestFlight / borrowed-device pass before Phase 1 sign-off | TBD | TBD | TBD | TBD | TBD |
+| Minimum supported | iOS 17.x, latest available 17 patch preferred | Skipped for Phase 0; record later if available through TestFlight or owned hardware | TBD | TBD | TBD | TBD | Skipped |
 | Current shipping | iOS 26.x, latest available patch | Physical iPhone | TBD | TBD | TBD | TBD | TBD |
 | Current simulator | iOS 26.4 or newer installed simulator runtime | iPhone simulator | Supporting evidence only | TBD | TBD | TBD | Supporting evidence only |
 | Intermediate compatibility | iOS 18.x, latest available patch | Physical device or simulator when available | TBD | TBD | TBD | TBD | TBD |
@@ -54,13 +54,21 @@ Required test-version matrix from `docs/specs/testing.md`:
 
 ## Current Findings
 
-No real-device finding yet. Simulator runs are not sufficient for this spike because the question is keyboard-extension microphone entitlement, Open Access behavior, memory ceiling, and Speech stability on device.
+No real-device finding was collected. Simulator runs are not sufficient to prove keyboard-extension microphone entitlement, Open Access behavior, memory ceiling, or Speech stability on device.
 
-Manual-device testing was postponed on 2026-05-15. This keeps Phase 0 moving on non-device evaluations, but the primary keyboard recording flow remains an unproven risk until the physical-device pass is resumed.
+Manual-device testing was postponed on 2026-05-15 and then skipped on 2026-05-19. The project will not wait for borrowed old devices before continuing. This keeps Phase 0 moving, but the primary keyboard recording flow remains an explicit unproven risk until measured on available hardware during Phase 1 / TestFlight.
+
+## Decision
+
+- Do not block Phase 1 on an old-device or borrowed-device recording pass.
+- Keep the keyboard recording harness available for any available hardware pass.
+- Treat the containing-app fallback flow as first-class, not a backup afterthought.
+- Do not claim production viability for in-keyboard recording until measurements exist.
+- If Phase 1 or TestFlight shows the keyboard extension cannot record reliably or stay inside memory / latency budgets, restrict or disable the primary flow and route users through fallback recording.
 
 ## Follow-up
 
-After real-device runs:
+When hardware data eventually exists:
 
 1. Replace the pending verdict above with viable / not viable / device-class dependent.
 2. Update the in-keyboard recording row in `ROADMAP.md`.

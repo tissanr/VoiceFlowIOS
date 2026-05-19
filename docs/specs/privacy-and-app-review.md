@@ -29,7 +29,7 @@ Draft permission-string direction lives in [../spikes/privacy-app-review-onboard
 
 - **Posture:** optional with fallback. The MVP works without Open Access via the fallback flow — see [architecture.md](architecture.md).
 - **Enables:** in-keyboard recording, `openURL` from the keyboard, smoother App Group sync, network access (e.g., remote LLM if ever enabled).
-- **Phase 0 must produce** a written go/no-go on whether the microphone path inside the keyboard is reliable enough on the chosen iOS baseline to be the primary flow.
+- Phase 0 produced a keyboard recording harness, but the old-device / borrowed-device hardware pass was skipped by product decision. Until physical measurements exist, in-keyboard recording must be presented as Open Access dependent and fallback recording must remain first-class.
 - Open Access behavior spike: [../spikes/open-access-behavior.md](../spikes/open-access-behavior.md).
 
 ---
