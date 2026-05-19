@@ -1,7 +1,7 @@
 # Phase 0 Spike: Open Access Behavior
 
 > **Date:** 2026-05-15
-> **Status:** In progress
+> **Status:** Postponed until after the Audio Interruption spike
 > **Scope:** `RequestsOpenAccess`, keyboard Full Access detection, and keyboard-to-app `openURL` behavior.
 
 ## Question
@@ -25,6 +25,8 @@ The containing app now registers the `voiceflow://` URL scheme and displays the 
 - The app target and keyboard extension build on the iOS 17.5 simulator with the harness in place.
 
 ## Manual validation matrix
+
+This matrix is postponed until the Audio Interruption spike has a harness and manual-device procedure. Open Access testing still needs to run before Phase 1 sign-off, but the next device pass should first validate interruption cleanup so microphone behavior is tested with the right instrumentation in place.
 
 Run these checks from a host text field with the VoiceFlow keyboard selected:
 

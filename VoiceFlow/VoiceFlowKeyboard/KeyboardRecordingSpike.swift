@@ -13,6 +13,7 @@ import Speech
 struct KeyboardRecordingSpikeSnapshot {
     var status: String
     var transcript: String
+    var recentAudioEvents: [String]
     var peakResidentMemoryMB: Double
     var tapToEngineStartMS: Double?
     var tapToFirstAudioBufferMS: Double?
@@ -44,6 +45,16 @@ final class KeyboardRecordingSpike {
     private var memoryTimer: Timer?
     private var inputTapInstalled = false
     private var speechActive = false
+    private var audioSessionObservers: [NSObjectProtocol] = []
+    private var recentAudioEvents: [String] = []
+
+    init() {
+        installAudioSessionObservers()
+    }
+
+    deinit {
+        audioSessionObservers.forEach(NotificationCenter.default.removeObserver)
+    }
 
     var isRecording: Bool {
         audioEngine.isRunning
@@ -55,6 +66,7 @@ final class KeyboardRecordingSpike {
         return KeyboardRecordingSpikeSnapshot(
             status: status,
             transcript: transcript,
+            recentAudioEvents: recentAudioEvents,
             peakResidentMemoryMB: peakResidentMemoryMB,
             tapToEngineStartMS: tapToEngineStartMS,
             tapToFirstAudioBufferMS: tapToFirstAudioBufferMS,
@@ -135,6 +147,12 @@ final class KeyboardRecordingSpike {
     }
 
     @MainActor
+    func recordLifecycleEvent(_ event: String) {
+        appendAudioEvent(event)
+        update(status: status)
+    }
+
+    @MainActor
     private func resetRunState() {
         cleanupAudio()
         transcript = ""
@@ -192,12 +210,13 @@ final class KeyboardRecordingSpike {
         }
     }
 
+    @MainActor
     private func startAudioEngine() throws {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(
             .record,
             mode: .measurement,
-            options: [.allowBluetooth]
+            options: [.allowBluetoothHFP]
         )
         try session.setActive(true, options: .notifyOthersOnDeactivation)
 
@@ -218,6 +237,7 @@ final class KeyboardRecordingSpike {
 
         audioEngine.prepare()
         try audioEngine.start()
+        appendAudioEvent("audio engine started")
     }
 
     @MainActor
@@ -271,6 +291,7 @@ final class KeyboardRecordingSpike {
         memoryTimer = nil
         if audioEngine.isRunning {
             audioEngine.stop()
+            appendAudioEvent("audio engine stopped")
         }
         removeInputTapIfNeeded()
         recognitionTask?.cancel()
@@ -296,6 +317,98 @@ final class KeyboardRecordingSpike {
         delegate?.keyboardRecordingSpikeDidUpdate(currentSnapshot())
     }
 
+    private func installAudioSessionObservers() {
+        let center = NotificationCenter.default
+        let session = AVAudioSession.sharedInstance()
+
+        audioSessionObservers = [
+            center.addObserver(
+                forName: AVAudioSession.interruptionNotification,
+                object: session,
+                queue: .main
+            ) { [weak self] notification in
+                let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+                let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
+                MainActor.assumeIsolated {
+                    self?.handleAudioInterruption(rawType: rawType, rawOptions: rawOptions)
+                }
+            },
+            center.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: session,
+                queue: .main
+            ) { [weak self] notification in
+                let rawReason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+                MainActor.assumeIsolated {
+                    self?.handleRouteChange(rawReason: rawReason)
+                }
+            },
+            center.addObserver(
+                forName: AVAudioSession.mediaServicesWereLostNotification,
+                object: session,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.appendAudioEvent("media services lost")
+                    self?.cleanupAudio()
+                    self?.update(status: "Audio services lost")
+                }
+            },
+            center.addObserver(
+                forName: AVAudioSession.mediaServicesWereResetNotification,
+                object: session,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.appendAudioEvent("media services reset")
+                    self?.update(status: "Audio services reset")
+                }
+            }
+        ]
+    }
+
+    @MainActor
+    private func handleAudioInterruption(rawType: UInt?, rawOptions: UInt?) {
+        guard
+            let rawType,
+            let type = AVAudioSession.InterruptionType(rawValue: rawType)
+        else {
+            appendAudioEvent("interruption: unknown")
+            update(status: status)
+            return
+        }
+
+        switch type {
+        case .began:
+            appendAudioEvent("interruption began")
+            cleanupAudio()
+            update(status: "Interrupted")
+        case .ended:
+            let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions ?? 0)
+            appendAudioEvent(options.contains(.shouldResume) ? "interruption ended: should resume" : "interruption ended")
+            update(status: "Interruption ended")
+        @unknown default:
+            appendAudioEvent("interruption: unknown type \(rawType)")
+            update(status: status)
+        }
+    }
+
+    @MainActor
+    private func handleRouteChange(rawReason: UInt?) {
+        let reason = rawReason.flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))?.spikeDescription ?? "unknown"
+        appendAudioEvent("route change: \(reason)")
+        update(status: status)
+    }
+
+    @MainActor
+    private func appendAudioEvent(_ event: String) {
+        let timestamp = Self.eventTimestampFormatter.string(from: Date())
+        recentAudioEvents.append("\(timestamp) \(event)")
+        if recentAudioEvents.count > 5 {
+            recentAudioEvents.removeFirst(recentAudioEvents.count - 5)
+        }
+    }
+
     private func elapsedMilliseconds(since start: ContinuousClock.Instant?) -> Double? {
         guard let start else { return nil }
         let duration = start.duration(to: .now)
@@ -314,6 +427,37 @@ final class KeyboardRecordingSpike {
 
         guard result == KERN_SUCCESS else { return 0 }
         return Double(info.resident_size) / 1_048_576.0
+    }
+
+    private static let eventTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
+}
+
+private extension AVAudioSession.RouteChangeReason {
+    var spikeDescription: String {
+        switch self {
+        case .unknown:
+            "unknown"
+        case .newDeviceAvailable:
+            "new device available"
+        case .oldDeviceUnavailable:
+            "old device unavailable"
+        case .categoryChange:
+            "category change"
+        case .override:
+            "override"
+        case .wakeFromSleep:
+            "wake from sleep"
+        case .noSuitableRouteForCategory:
+            "no suitable route"
+        case .routeConfigurationChange:
+            "route configuration change"
+        @unknown default:
+            "unknown \(rawValue)"
+        }
     }
 }
 
