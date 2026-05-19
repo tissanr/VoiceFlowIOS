@@ -9,198 +9,338 @@ import UIKit
 import VoiceFlowShared
 
 final class KeyboardViewController: UIInputViewController {
-
     @IBOutlet var nextKeyboardButton: UIButton!
+
     private let defaultSettings = VoiceFlowSettings.defaults
     private let recordingSpike = KeyboardRecordingSpike()
-    private let spikeStackView = UIStackView()
-    private let titleLabel = UILabel()
-    private let statusLabel = UILabel()
-    private let transcriptLabel = UILabel()
-    private let metricsLabel = UILabel()
-    private let audioEventsLabel = UILabel()
-    private let recordButton = UIButton(type: .system)
-    private let speechButton = UIButton(type: .system)
-    private let openAppButton = UIButton(type: .system)
-    private let cancelButton = UIButton(type: .system)
-    
-    override func updateViewConstraints() {
-        super.updateViewConstraints()
-        
-        // Add custom view sizing constraints here
+    private var sharedStoreClient: SharedStoreClient?
+    private var pendingInsert: PendingInsert?
+    private var shellState: KeyboardShellState = .compact(hasPendingInsert: false) {
+        didSet { render() }
     }
-    
+    private var recordingStartDate: Date?
+    private var elapsedTimer: Timer?
+    private var latestReviewText = ""
+
+    private let rootStackView = UIStackView()
+    private let headerStackView = UIStackView()
+    private let titleLabel = UILabel()
+    private let detailLabel = UILabel()
+    private let accessBadgeLabel = UILabel()
+    private let previewLabel = UILabel()
+    private let levelMeter = UIProgressView(progressViewStyle: .bar)
+    private let timerLabel = UILabel()
+    private let primaryButton = UIButton(type: .system)
+    private let secondaryButton = UIButton(type: .system)
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Perform custom UI setup here
-        self.nextKeyboardButton = UIButton(type: .system)
+
         _ = defaultSettings
         recordingSpike.delegate = self
-        
-        self.nextKeyboardButton.setTitle(NSLocalizedString("Next Keyboard", comment: "Title for 'Next Keyboard' button"), for: [])
-        self.nextKeyboardButton.sizeToFit()
-        self.nextKeyboardButton.translatesAutoresizingMaskIntoConstraints = false
-        
-        self.nextKeyboardButton.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
-        
-        self.view.addSubview(self.nextKeyboardButton)
-        
-        self.nextKeyboardButton.leftAnchor.constraint(equalTo: self.view.leftAnchor).isActive = true
-        self.nextKeyboardButton.bottomAnchor.constraint(equalTo: self.view.bottomAnchor).isActive = true
-        configureSpikeUI()
+        sharedStoreClient = try? SharedStoreClient()
+        configureUI()
+        if sharedStoreClient == nil {
+            shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
+        } else {
+            refreshPendingInsert()
+        }
+        render()
     }
-    
+
     override func viewWillLayoutSubviews() {
-        self.nextKeyboardButton.isHidden = !self.needsInputModeSwitchKey
         super.viewWillLayoutSubviews()
+        nextKeyboardButton.isHidden = !needsInputModeSwitchKey
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         recordingSpike.recordLifecycleEvent("keyboard view appeared")
+        refreshPendingInsert()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         recordingSpike.recordLifecycleEvent("keyboard view disappearing")
-    }
-    
-    override func textWillChange(_ textInput: UITextInput?) {
-        // The app is about to change the document's contents. Perform any preparation here.
-    }
-    
-    override func textDidChange(_ textInput: UITextInput?) {
-        // The app has just changed the document's contents, the document context has been updated.
-        
-        var textColor: UIColor
-        let proxy = self.textDocumentProxy
-        if proxy.keyboardAppearance == UIKeyboardAppearance.dark {
-            textColor = UIColor.white
-        } else {
-            textColor = UIColor.black
-        }
-        self.nextKeyboardButton.setTitleColor(textColor, for: [])
+        stopElapsedTimer()
     }
 
-    private func configureSpikeUI() {
+    override func textDidChange(_ textInput: UITextInput?) {
+        updateColors()
+        refreshPendingInsert()
+    }
+
+    private func configureUI() {
         view.backgroundColor = .systemBackground
 
-        spikeStackView.axis = .vertical
-        spikeStackView.alignment = .fill
-        spikeStackView.spacing = 8
-        spikeStackView.translatesAutoresizingMaskIntoConstraints = false
+        nextKeyboardButton = UIButton(type: .system)
+        if let image = UIImage(systemName: "globe") {
+            nextKeyboardButton.setImage(image, for: .normal)
+        } else {
+            nextKeyboardButton.setTitle("Next", for: .normal)
+        }
+        nextKeyboardButton.translatesAutoresizingMaskIntoConstraints = false
+        nextKeyboardButton.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
+        nextKeyboardButton.accessibilityLabel = "Next Keyboard"
+        nextKeyboardButton.accessibilityHint = "Switches to the next keyboard."
+        view.addSubview(nextKeyboardButton)
+
+        rootStackView.axis = .vertical
+        rootStackView.alignment = .fill
+        rootStackView.spacing = 10
+        rootStackView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(rootStackView)
+
+        headerStackView.axis = .horizontal
+        headerStackView.alignment = .firstBaseline
+        headerStackView.spacing = 8
 
         titleLabel.font = .preferredFont(forTextStyle: .headline)
-        titleLabel.text = "VoiceFlow Phase 0 Spike"
+        titleLabel.adjustsFontForContentSizeCategory = true
 
-        statusLabel.font = .preferredFont(forTextStyle: .subheadline)
-        statusLabel.numberOfLines = 2
-        
-        let fullAccessStatus = hasFullAccess ? "Full Access: ON" : "Full Access: OFF"
-        statusLabel.text = "\(fullAccessStatus)\nEnable Full Access to test Deep Link."
+        accessBadgeLabel.font = .preferredFont(forTextStyle: .caption1)
+        accessBadgeLabel.adjustsFontForContentSizeCategory = true
+        accessBadgeLabel.textAlignment = .right
+        accessBadgeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        transcriptLabel.font = .preferredFont(forTextStyle: .body)
-        transcriptLabel.numberOfLines = 3
-        transcriptLabel.text = "In-keyboard recording is the secondary path. Opening the App is the primary MVP path."
+        headerStackView.addArrangedSubview(titleLabel)
+        headerStackView.addArrangedSubview(UIView())
+        headerStackView.addArrangedSubview(accessBadgeLabel)
 
-        metricsLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        metricsLabel.numberOfLines = 5
-        metricsLabel.textColor = .secondaryLabel
-        metricsLabel.text = "App Group ID: \(VoiceFlowConstants.appGroupIdentifier)\nURL: voiceflow://"
+        detailLabel.font = .preferredFont(forTextStyle: .subheadline)
+        detailLabel.adjustsFontForContentSizeCategory = true
+        detailLabel.numberOfLines = 2
 
-        audioEventsLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        audioEventsLabel.numberOfLines = 5
-        audioEventsLabel.textColor = .secondaryLabel
-        audioEventsLabel.text = "audio events: none"
+        previewLabel.font = .preferredFont(forTextStyle: .body)
+        previewLabel.adjustsFontForContentSizeCategory = true
+        previewLabel.numberOfLines = 3
+        previewLabel.layer.cornerRadius = 8
+        previewLabel.layer.masksToBounds = true
 
-        recordButton.setTitle("Local Record", for: .normal)
-        recordButton.addTarget(self, action: #selector(toggleSpikeRecording), for: .touchUpInside)
+        levelMeter.progress = 0.18
 
-        openAppButton.setTitle("Open VoiceFlow", for: .normal)
-        openAppButton.titleLabel?.font = .boldSystemFont(ofSize: 16)
-        openAppButton.addTarget(self, action: #selector(openMainApp), for: .touchUpInside)
+        timerLabel.font = .monospacedDigitSystemFont(ofSize: 15, weight: .medium)
+        timerLabel.textAlignment = .center
+        timerLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        cancelButton.setTitle("Cancel", for: .normal)
-        cancelButton.addTarget(self, action: #selector(cancelSpikeRecording), for: .touchUpInside)
+        let meterRow = UIStackView(arrangedSubviews: [levelMeter, timerLabel])
+        meterRow.axis = .horizontal
+        meterRow.alignment = .center
+        meterRow.spacing = 10
+        meterRow.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
 
-        let buttonRow = UIStackView(arrangedSubviews: [recordButton, openAppButton, cancelButton])
+        primaryButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        primaryButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        primaryButton.addTarget(self, action: #selector(primaryActionTapped), for: .touchUpInside)
+        primaryButton.accessibilityHint = "Performs the main VoiceFlow keyboard action."
+
+        secondaryButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        secondaryButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        secondaryButton.addTarget(self, action: #selector(secondaryActionTapped), for: .touchUpInside)
+        secondaryButton.accessibilityHint = "Performs the secondary VoiceFlow keyboard action."
+
+        let buttonRow = UIStackView(arrangedSubviews: [primaryButton, secondaryButton])
         buttonRow.axis = .horizontal
         buttonRow.alignment = .fill
-        buttonRow.distribution = .fillProportionally
+        buttonRow.distribution = .fillEqually
         buttonRow.spacing = 8
 
-        spikeStackView.addArrangedSubview(titleLabel)
-        spikeStackView.addArrangedSubview(statusLabel)
-        spikeStackView.addArrangedSubview(transcriptLabel)
-        spikeStackView.addArrangedSubview(metricsLabel)
-        spikeStackView.addArrangedSubview(audioEventsLabel)
-        spikeStackView.addArrangedSubview(buttonRow)
-        view.addSubview(spikeStackView)
+        rootStackView.addArrangedSubview(headerStackView)
+        rootStackView.addArrangedSubview(detailLabel)
+        rootStackView.addArrangedSubview(previewLabel)
+        rootStackView.addArrangedSubview(meterRow)
+        rootStackView.addArrangedSubview(buttonRow)
 
         NSLayoutConstraint.activate([
             view.heightAnchor.constraint(greaterThanOrEqualToConstant: 216),
-            spikeStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            spikeStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            spikeStackView.topAnchor.constraint(equalTo: view.topAnchor, constant: 12),
-            spikeStackView.bottomAnchor.constraint(lessThanOrEqualTo: nextKeyboardButton.topAnchor, constant: -12)
+            nextKeyboardButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            nextKeyboardButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -8),
+            nextKeyboardButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            nextKeyboardButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+
+            rootStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            rootStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            rootStackView.topAnchor.constraint(equalTo: view.topAnchor, constant: 12),
+            rootStackView.bottomAnchor.constraint(lessThanOrEqualTo: nextKeyboardButton.topAnchor, constant: -8),
+
+            primaryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            secondaryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            timerLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 48)
         ])
 
-        keyboardRecordingSpikeDidUpdate(recordingSpike.currentSnapshot())
+        updateColors()
     }
 
-    @objc private func openMainApp() {
-        let url = URL(string: "voiceflow://record")!
-        statusLabel.text = "Opening VoiceFlow..."
+    private func render() {
+        guard isViewLoaded else { return }
 
-        extensionContext?.open(url) { [weak statusLabel] success in
-            DispatchQueue.main.async {
-                statusLabel?.text = success
-                    ? "Open URL reported success"
-                    : "Open URL reported failure"
+        let viewModel = KeyboardShellViewModel(state: shellState)
+        titleLabel.text = viewModel.title
+        detailLabel.text = viewModel.detail
+        accessBadgeLabel.text = hasFullAccess ? "Full Access" : "Handoff Mode"
+        previewLabel.text = viewModel.preview
+        previewLabel.isHidden = viewModel.preview == nil
+        levelMeter.isHidden = !viewModel.showsLevelMeter
+        timerLabel.isHidden = viewModel.timerText == nil
+        timerLabel.text = viewModel.timerText
+        primaryButton.setTitle(viewModel.primaryActionTitle, for: .normal)
+        primaryButton.isEnabled = viewModel.primaryActionEnabled
+        secondaryButton.setTitle(viewModel.secondaryActionTitle, for: .normal)
+        secondaryButton.isHidden = viewModel.secondaryActionTitle == nil
+        primaryButton.accessibilityLabel = viewModel.primaryActionTitle
+        secondaryButton.accessibilityLabel = viewModel.secondaryActionTitle
+
+        updateColors()
+    }
+
+    private func updateColors() {
+        let isDark = textDocumentProxy.keyboardAppearance == .dark
+        let foregroundColor: UIColor = isDark ? .white : .label
+        let secondaryColor: UIColor = isDark ? .lightGray : .secondaryLabel
+        let fillColor: UIColor = isDark ? .secondarySystemBackground : .tertiarySystemFill
+
+        titleLabel.textColor = foregroundColor
+        detailLabel.textColor = secondaryColor
+        accessBadgeLabel.textColor = secondaryColor
+        timerLabel.textColor = secondaryColor
+        previewLabel.textColor = foregroundColor
+        previewLabel.backgroundColor = fillColor
+        nextKeyboardButton.tintColor = foregroundColor
+        primaryButton.tintColor = .systemBlue
+        secondaryButton.tintColor = secondaryColor
+    }
+
+    private func refreshPendingInsert() {
+        guard let sharedStoreClient else {
+            pendingInsert = nil
+            shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
+            return
+        }
+
+        do {
+            pendingInsert = try sharedStoreClient.pendingInsertForKeyboard()
+        } catch {
+            pendingInsert = nil
+            shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
+            return
+        }
+
+        if case .compact = shellState {
+            shellState = .compact(hasPendingInsert: pendingInsert != nil)
+        }
+    }
+
+    private func startElapsedTimer() {
+        recordingStartDate = Date()
+        elapsedTimer?.invalidate()
+        elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.tickElapsedTime()
+        }
+    }
+
+    private func stopElapsedTimer() {
+        elapsedTimer?.invalidate()
+        elapsedTimer = nil
+        recordingStartDate = nil
+    }
+
+    private func tickElapsedTime() {
+        guard let recordingStartDate else { return }
+        let elapsedSeconds = max(0, Int(Date().timeIntervalSince(recordingStartDate)))
+
+        switch shellState {
+        case .recording:
+            shellState = .recording(elapsedSeconds: elapsedSeconds)
+        case .transcribing:
+            shellState = .transcribing(elapsedSeconds: elapsedSeconds)
+        case .reviewing(let preview, _):
+            shellState = .reviewing(preview: preview, elapsedSeconds: elapsedSeconds)
+        default:
+            stopElapsedTimer()
+        }
+    }
+
+    @objc private func primaryActionTapped() {
+        switch shellState {
+        case .compact:
+            guard hasFullAccess else {
+                shellState = .insertUnavailable(reason: .openAccessRequired)
+                return
             }
-        }
-    }
+            startElapsedTimer()
+            shellState = .recording(elapsedSeconds: 0)
 
-    @objc private func toggleSpikeRecording() {
-        if recordingSpike.isRecording {
-            recordingSpike.stop()
-        } else {
-            Task { @MainActor in
-                await recordingSpike.start(localeIdentifier: "en-US")
+        case .recording:
+            shellState = .transcribing(elapsedSeconds: elapsedSeconds)
+
+        case .transcribing:
+            latestReviewText = pendingInsert?.text ?? "Preview text will appear here after transcription."
+            shellState = .reviewing(preview: latestReviewText, elapsedSeconds: elapsedSeconds)
+
+        case .reviewing(let preview, _):
+            stopElapsedTimer()
+            latestReviewText = preview
+            shellState = .pending(preview: preview)
+
+        case .pending(let preview):
+            latestReviewText = preview
+            shellState = .compact(hasPendingInsert: pendingInsert != nil)
+
+        case .insertUnavailable:
+            if !latestReviewText.isEmpty {
+                UIPasteboard.general.string = latestReviewText
             }
+            shellState = .compact(hasPendingInsert: pendingInsert != nil)
         }
     }
 
-    @objc private func attachSpikeSpeech() {
-        Task { @MainActor in
-            await recordingSpike.attachSpeech(localeIdentifier: "en-US")
+    @objc private func secondaryActionTapped() {
+        switch shellState {
+        case .compact:
+            if let pendingInsert {
+                latestReviewText = pendingInsert.text
+                shellState = .pending(preview: pendingInsert.text)
+            }
+
+        case .pending:
+            guard discardPendingInsert() else { return }
+            pendingInsert = nil
+            latestReviewText = ""
+            shellState = .compact(hasPendingInsert: false)
+
+        case .recording, .transcribing, .reviewing, .insertUnavailable:
+            stopElapsedTimer()
+            shellState = .compact(hasPendingInsert: pendingInsert != nil)
         }
     }
 
-    @objc private func cancelSpikeRecording() {
-        recordingSpike.cancel()
+    private var elapsedSeconds: Int {
+        guard let recordingStartDate else { return 0 }
+        return max(0, Int(Date().timeIntervalSince(recordingStartDate)))
     }
 
-    private func format(milliseconds: Double?) -> String {
-        guard let milliseconds else { return "n/a" }
-        return String(format: "%.0f ms", milliseconds)
+    private func discardPendingInsert() -> Bool {
+        guard let pendingInsert else { return true }
+
+        do {
+            try sharedStoreClient?.consumePendingInsert(generation: pendingInsert.generation)
+            return true
+        } catch {
+            shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
+            return false
+        }
     }
 }
 
 extension KeyboardViewController: KeyboardRecordingSpikeDelegate {
     func keyboardRecordingSpikeDidUpdate(_ snapshot: KeyboardRecordingSpikeSnapshot) {
-        statusLabel.text = snapshot.status
-        transcriptLabel.text = snapshot.transcript.isEmpty ? "Listening..." : snapshot.transcript
-        metricsLabel.text = """
-        peak rss: \(String(format: "%.1f MB", snapshot.peakResidentMemoryMB))
-        tap -> engine: \(format(milliseconds: snapshot.tapToEngineStartMS))
-        tap -> first buffer: \(format(milliseconds: snapshot.tapToFirstAudioBufferMS))
-        stop -> final: \(format(milliseconds: snapshot.stopToFinalResultMS))
-        """
-        audioEventsLabel.text = snapshot.recentAudioEvents.isEmpty
-            ? "audio events: none"
-            : snapshot.recentAudioEvents.joined(separator: "\n")
-        recordButton.setTitle(snapshot.isRecording ? "Stop Recording" : "Start Spike Recording", for: .normal)
+        levelMeter.progress = snapshot.isRecording ? 0.72 : 0.18
+
+        guard !snapshot.transcript.isEmpty else { return }
+        latestReviewText = snapshot.transcript
+
+        if case .recording = shellState {
+            shellState = .reviewing(preview: snapshot.transcript, elapsedSeconds: elapsedSeconds)
+        }
     }
 }

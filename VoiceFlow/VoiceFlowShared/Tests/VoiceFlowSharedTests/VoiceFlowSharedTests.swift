@@ -219,6 +219,44 @@ final class VoiceFlowSharedTests: XCTestCase {
         }
     }
 
+    func testKeyboardShellCompactShowsPendingActionWhenPendingInsertExists() {
+        let viewModel = KeyboardShellViewModel(state: .compact(hasPendingInsert: true))
+
+        XCTAssertEqual(viewModel.title, "VoiceFlow")
+        XCTAssertEqual(viewModel.detail, "Pending text is ready.")
+        XCTAssertEqual(viewModel.primaryActionTitle, "Dictate")
+        XCTAssertEqual(viewModel.secondaryActionTitle, "Review Pending")
+        XCTAssertFalse(viewModel.showsLevelMeter)
+    }
+
+    func testKeyboardShellRecordingShowsMeterAndTimer() {
+        let viewModel = KeyboardShellViewModel(state: .recording(elapsedSeconds: 65))
+
+        XCTAssertEqual(viewModel.title, "Recording")
+        XCTAssertEqual(viewModel.primaryActionTitle, "Stop")
+        XCTAssertEqual(viewModel.secondaryActionTitle, "Cancel")
+        XCTAssertEqual(viewModel.timerText, "1:05")
+        XCTAssertTrue(viewModel.showsLevelMeter)
+    }
+
+    func testKeyboardShellPendingCompactsWhitespaceInPreview() {
+        let viewModel = KeyboardShellViewModel(state: .pending(preview: "  Hello\n\nworld  "))
+
+        XCTAssertEqual(viewModel.title, "Pending")
+        XCTAssertEqual(viewModel.preview, "Hello world")
+        XCTAssertEqual(viewModel.primaryActionTitle, "Insert")
+        XCTAssertEqual(viewModel.secondaryActionTitle, "Discard")
+    }
+
+    func testKeyboardShellUnavailableDisablesClipboardWhenOpenAccessIsRequired() {
+        let viewModel = KeyboardShellViewModel(state: .insertUnavailable(reason: .openAccessRequired))
+
+        XCTAssertEqual(viewModel.title, "Insert Unavailable")
+        XCTAssertEqual(viewModel.detail, "Full Access is required for in-keyboard dictation.")
+        XCTAssertEqual(viewModel.primaryActionTitle, "Copy")
+        XCTAssertFalse(viewModel.primaryActionEnabled)
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "VoiceFlowSharedTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
