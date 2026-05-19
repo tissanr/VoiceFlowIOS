@@ -2,8 +2,6 @@
 //  KeyboardViewController.swift
 //  VoiceFlowKeyboard
 //
-//  Created by Stephan Reiter on 2026-04-28.
-//
 
 import UIKit
 import VoiceFlowShared
@@ -11,8 +9,9 @@ import VoiceFlowShared
 final class KeyboardViewController: UIInputViewController {
     @IBOutlet var nextKeyboardButton: UIButton!
 
-    private let defaultSettings = VoiceFlowSettings.defaults
-    private let recordingSpike = KeyboardRecordingSpike()
+    private let settings = VoiceFlowSettings.defaults
+    private var speechEngine: AppleSpeechEngine?
+    private let postProcessor = PostProcessor()
     private var sharedStoreClient: SharedStoreClient?
     private var pendingInsert: PendingInsert?
     private var shellState: KeyboardShellState = .compact(hasPendingInsert: false) {
@@ -36,8 +35,6 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        _ = defaultSettings
-        recordingSpike.delegate = self
         sharedStoreClient = try? SharedStoreClient()
         configureUI()
         if sharedStoreClient == nil {
@@ -55,14 +52,14 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        recordingSpike.recordLifecycleEvent("keyboard view appeared")
         refreshPendingInsert()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        recordingSpike.recordLifecycleEvent("keyboard view disappearing")
         stopElapsedTimer()
+        speechEngine?.cancel()
+        speechEngine = nil
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -117,7 +114,7 @@ final class KeyboardViewController: UIInputViewController {
         previewLabel.layer.cornerRadius = 8
         previewLabel.layer.masksToBounds = true
 
-        levelMeter.progress = 0.18
+        levelMeter.progress = 0
 
         timerLabel.font = .monospacedDigitSystemFont(ofSize: 15, weight: .medium)
         timerLabel.textAlignment = .center
@@ -267,24 +264,25 @@ final class KeyboardViewController: UIInputViewController {
                 shellState = .insertUnavailable(reason: .openAccessRequired)
                 return
             }
-            startElapsedTimer()
-            shellState = .recording(elapsedSeconds: 0)
+            if let reason = InsertGuard.check(proxy: textDocumentProxy) {
+                shellState = .insertUnavailable(reason: reason)
+                return
+            }
+            startDictation()
 
         case .recording:
+            speechEngine?.stop()
             shellState = .transcribing(elapsedSeconds: elapsedSeconds)
 
         case .transcribing:
-            latestReviewText = pendingInsert?.text ?? "Preview text will appear here after transcription."
-            shellState = .reviewing(preview: latestReviewText, elapsedSeconds: elapsedSeconds)
+            break // waiting for final recognition result
 
-        case .reviewing(let preview, _):
-            stopElapsedTimer()
-            latestReviewText = preview
-            shellState = .pending(preview: preview)
+        case .reviewing:
+            speechEngine?.stop()
+            shellState = .transcribing(elapsedSeconds: elapsedSeconds)
 
         case .pending(let preview):
-            latestReviewText = preview
-            shellState = .compact(hasPendingInsert: pendingInsert != nil)
+            performInsert(text: preview)
 
         case .insertUnavailable:
             if !latestReviewText.isEmpty {
@@ -309,8 +307,7 @@ final class KeyboardViewController: UIInputViewController {
             shellState = .compact(hasPendingInsert: false)
 
         case .recording, .transcribing, .reviewing, .insertUnavailable:
-            stopElapsedTimer()
-            shellState = .compact(hasPendingInsert: pendingInsert != nil)
+            cancelDictation()
         }
     }
 
@@ -319,28 +316,126 @@ final class KeyboardViewController: UIInputViewController {
         return max(0, Int(Date().timeIntervalSince(recordingStartDate)))
     }
 
+    // MARK: - Dictation
+
+    private func startDictation() {
+        let engine = AppleSpeechEngine()
+        speechEngine = engine
+        let locale = settings.localeMode.resolvedLocale
+
+        startElapsedTimer()
+        shellState = .recording(elapsedSeconds: 0)
+        levelMeter.progress = 0.6
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await engine.requestPermissions()
+                try await engine.start(locale: locale) { [weak self] event in
+                    self?.handleSpeechEvent(event)
+                }
+            } catch {
+                self.stopElapsedTimer()
+                self.speechEngine = nil
+                self.levelMeter.progress = 0
+                self.shellState = self.mapEngineError(error)
+            }
+        }
+    }
+
+    private func cancelDictation() {
+        speechEngine?.cancel()
+        speechEngine = nil
+        stopElapsedTimer()
+        levelMeter.progress = 0
+        latestReviewText = ""
+        shellState = .compact(hasPendingInsert: pendingInsert != nil)
+    }
+
+    private func handleSpeechEvent(_ event: SpeechEvent) {
+        switch event {
+        case .partial(let transcript):
+            guard !transcript.isEmpty else { return }
+            latestReviewText = transcript
+            if case .recording = shellState {
+                shellState = .reviewing(preview: transcript, elapsedSeconds: elapsedSeconds)
+            } else if case .reviewing = shellState {
+                shellState = .reviewing(preview: transcript, elapsedSeconds: elapsedSeconds)
+            }
+
+        case .final(let transcript):
+            speechEngine = nil
+            stopElapsedTimer()
+            levelMeter.progress = 0
+            let processed = postProcessor.process(transcript)
+            latestReviewText = processed
+            shellState = .pending(preview: processed)
+
+        case .interrupted(let partial):
+            speechEngine = nil
+            stopElapsedTimer()
+            levelMeter.progress = 0
+            if let partial, !partial.isEmpty {
+                let processed = postProcessor.process(partial)
+                latestReviewText = processed
+                shellState = .reviewing(preview: processed, elapsedSeconds: 0)
+            } else {
+                latestReviewText = ""
+                shellState = .compact(hasPendingInsert: pendingInsert != nil)
+            }
+
+        case .failed:
+            speechEngine = nil
+            stopElapsedTimer()
+            levelMeter.progress = 0
+            if !latestReviewText.isEmpty {
+                shellState = .reviewing(preview: latestReviewText, elapsedSeconds: 0)
+            } else {
+                shellState = .insertUnavailable(reason: .unknown)
+            }
+        }
+    }
+
+    private func mapEngineError(_ error: Error) -> KeyboardShellState {
+        if let engineError = error as? SpeechEngineError {
+            switch engineError {
+            case .microphonePermissionDenied, .speechPermissionDenied:
+                return .insertUnavailable(reason: .openAccessRequired)
+            default:
+                return .insertUnavailable(reason: .unknown)
+            }
+        }
+        return .insertUnavailable(reason: .unknown)
+    }
+
+    // MARK: - Insert
+
+    private func performInsert(text: String) {
+        let context = InsertContext(
+            beforeInput: textDocumentProxy.documentContextBeforeInput,
+            afterInput: textDocumentProxy.documentContextAfterInput
+        )
+        let planned = InsertContextPlanner.plan(text: text, context: context)
+        textDocumentProxy.insertText(planned.text)
+        consumePendingInsertIfNeeded()
+        latestReviewText = ""
+        shellState = .compact(hasPendingInsert: false)
+    }
+
+    private func consumePendingInsertIfNeeded() {
+        guard let pendingInsert else { return }
+        try? sharedStoreClient?.consumePendingInsert(generation: pendingInsert.generation)
+        self.pendingInsert = nil
+    }
+
     private func discardPendingInsert() -> Bool {
         guard let pendingInsert else { return true }
-
         do {
             try sharedStoreClient?.consumePendingInsert(generation: pendingInsert.generation)
             return true
         } catch {
             shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
             return false
-        }
-    }
-}
-
-extension KeyboardViewController: KeyboardRecordingSpikeDelegate {
-    func keyboardRecordingSpikeDidUpdate(_ snapshot: KeyboardRecordingSpikeSnapshot) {
-        levelMeter.progress = snapshot.isRecording ? 0.72 : 0.18
-
-        guard !snapshot.transcript.isEmpty else { return }
-        latestReviewText = snapshot.transcript
-
-        if case .recording = shellState {
-            shellState = .reviewing(preview: snapshot.transcript, elapsedSeconds: elapsedSeconds)
         }
     }
 }
