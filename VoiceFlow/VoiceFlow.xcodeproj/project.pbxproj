@@ -56,6 +56,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D4CD20102FA2000000736CEE /* Exceptions for "VoiceFlow" folder in "VoiceFlow" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D4CD11332FA0FF8D00736CEE /* VoiceFlow */;
+		};
 		D4CD116A2FA0FFE400736CEE /* Exceptions for "VoiceFlowKeyboard" folder in "VoiceFlowKeyboard" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -68,6 +75,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D4CD11362FA0FF8D00736CEE /* VoiceFlow */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D4CD20102FA2000000736CEE /* Exceptions for "VoiceFlow" folder in "VoiceFlow" target */,
+			);
 			path = VoiceFlow;
 			sourceTree = "<group>";
 		};
@@ -476,6 +486,7 @@
 				DEVELOPMENT_TEAM = A2W56RK8VG;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VoiceFlow/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -509,6 +520,7 @@
 				DEVELOPMENT_TEAM = A2W56RK8VG;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VoiceFlow/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
