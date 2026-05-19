@@ -18,6 +18,7 @@ final class KeyboardViewController: UIInputViewController {
     private let statusLabel = UILabel()
     private let transcriptLabel = UILabel()
     private let metricsLabel = UILabel()
+    private let audioEventsLabel = UILabel()
     private let recordButton = UIButton(type: .system)
     private let speechButton = UIButton(type: .system)
     private let openAppButton = UIButton(type: .system)
@@ -53,6 +54,16 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillLayoutSubviews() {
         self.nextKeyboardButton.isHidden = !self.needsInputModeSwitchKey
         super.viewWillLayoutSubviews()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        recordingSpike.recordLifecycleEvent("keyboard view appeared")
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        recordingSpike.recordLifecycleEvent("keyboard view disappearing")
     }
     
     override func textWillChange(_ textInput: UITextInput?) {
@@ -98,6 +109,11 @@ final class KeyboardViewController: UIInputViewController {
         metricsLabel.textColor = .secondaryLabel
         metricsLabel.text = "App Group ID: \(VoiceFlowConstants.appGroupIdentifier)\nURL: voiceflow://"
 
+        audioEventsLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        audioEventsLabel.numberOfLines = 5
+        audioEventsLabel.textColor = .secondaryLabel
+        audioEventsLabel.text = "audio events: none"
+
         recordButton.setTitle("Local Record", for: .normal)
         recordButton.addTarget(self, action: #selector(toggleSpikeRecording), for: .touchUpInside)
 
@@ -118,6 +134,7 @@ final class KeyboardViewController: UIInputViewController {
         spikeStackView.addArrangedSubview(statusLabel)
         spikeStackView.addArrangedSubview(transcriptLabel)
         spikeStackView.addArrangedSubview(metricsLabel)
+        spikeStackView.addArrangedSubview(audioEventsLabel)
         spikeStackView.addArrangedSubview(buttonRow)
         view.addSubview(spikeStackView)
 
@@ -181,6 +198,9 @@ extension KeyboardViewController: KeyboardRecordingSpikeDelegate {
         tap -> first buffer: \(format(milliseconds: snapshot.tapToFirstAudioBufferMS))
         stop -> final: \(format(milliseconds: snapshot.stopToFinalResultMS))
         """
+        audioEventsLabel.text = snapshot.recentAudioEvents.isEmpty
+            ? "audio events: none"
+            : snapshot.recentAudioEvents.joined(separator: "\n")
         recordButton.setTitle(snapshot.isRecording ? "Stop Recording" : "Start Spike Recording", for: .normal)
     }
 }
