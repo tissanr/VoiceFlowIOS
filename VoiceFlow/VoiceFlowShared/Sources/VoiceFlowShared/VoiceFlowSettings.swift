@@ -31,6 +31,14 @@ public enum LocaleMode: String, Codable, Equatable, CaseIterable, Sendable {
     case automatic
     case german
     case english
+
+    public var resolvedLocale: Locale {
+        switch self {
+        case .automatic: return Locale.current
+        case .german: return Locale(identifier: "de-DE")
+        case .english: return Locale(identifier: "en-US")
+        }
+    }
 }
 
 public enum CorrectionLevel: String, Codable, Equatable, CaseIterable, Sendable {

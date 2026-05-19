@@ -257,6 +257,50 @@ final class VoiceFlowSharedTests: XCTestCase {
         XCTAssertFalse(viewModel.primaryActionEnabled)
     }
 
+    // MARK: - PostProcessor
+
+    func testPostProcessorTrimsWhitespace() {
+        let processor = PostProcessor(correctionLevel: .minimal)
+        XCTAssertEqual(processor.process("  hello world  "), "hello world")
+    }
+
+    func testPostProcessorCollapsesMultipleSpaces() {
+        let processor = PostProcessor(correctionLevel: .minimal)
+        XCTAssertEqual(processor.process("hello  world"), "hello world")
+    }
+
+    func testPostProcessorSoftRemovesSpaceBeforePunctuation() {
+        let processor = PostProcessor(correctionLevel: .soft)
+        XCTAssertEqual(processor.process("hello , world"), "hello, world")
+        XCTAssertEqual(processor.process("done ."), "done.")
+        XCTAssertEqual(processor.process("wait !"), "wait!")
+    }
+
+    func testPostProcessorMinimalPreservesSpaceBeforePunctuation() {
+        let processor = PostProcessor(correctionLevel: .minimal)
+        XCTAssertEqual(processor.process("hello , world"), "hello , world")
+    }
+
+    func testPostProcessorReturnsEmptyStringUnchanged() {
+        let processor = PostProcessor(correctionLevel: .soft)
+        XCTAssertEqual(processor.process(""), "")
+        XCTAssertEqual(processor.process("   "), "")
+    }
+
+    func testPostProcessorSoftPassesThroughNormalText() {
+        let processor = PostProcessor(correctionLevel: .soft)
+        let input = "Hello, world. This is a test."
+        XCTAssertEqual(processor.process(input), input)
+    }
+
+    func testLocaleModeResolvesCorrectly() {
+        XCTAssertEqual(LocaleMode.german.resolvedLocale.identifier, "de-DE")
+        XCTAssertEqual(LocaleMode.english.resolvedLocale.identifier, "en-US")
+        XCTAssertEqual(LocaleMode.automatic.resolvedLocale.identifier, Locale.current.identifier)
+    }
+
+    // MARK: - Helpers
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "VoiceFlowSharedTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

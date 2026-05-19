@@ -1,6 +1,6 @@
 # VoiceFlow iOS — Roadmap
 
-> **Last updated:** 2026-05-15
+> **Last updated:** 2026-05-19
 > **Purpose:** Index of specifications, implementation status, and phase plan. The detailed product spec lives in [`docs/specs/`](docs/specs/) — start there for any deep dive.
 
 ---
@@ -22,7 +22,7 @@ Start here to see where the project is. The table is intentionally split by subp
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.7 Privacy / App Review / onboarding drafts | 🟨 Awaiting review / blocked | Privacy nutrition label, App Review narrative, onboarding direction, and permission-string direction are drafted; human review pending. |
 | Phase 0 — Foundation, Spikes, Privacy Narrative | 0.8 Build + CI baseline | 🟩 Done | GitHub Actions Swift workflow runs from `VoiceFlow/VoiceFlowShared`; local SwiftPM build and unit tests pass from that package path. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.1 Keyboard UI state shell | 🟩 Done | Compact, Recording, Transcribing, Reviewing, Pending, and InsertUnavailable states render in the keyboard extension shell. |
-| Phase 1 — Keyboard MVP with Secure-Field handling | 1.2 Primary in-keyboard dictation flow | 🟥 Not started | Proceeds with harness-only Phase 0 evidence; validate on available hardware during implementation / TestFlight and fall back if unreliable. |
+| Phase 1 — Keyboard MVP with Secure-Field handling | 1.2 Primary in-keyboard dictation flow | 🟩 Done | `AppleSpeechEngine`, `PostProcessor`, `InsertGuard`, and `KeyboardViewController` wired end-to-end: record → partial previews → final → postprocess → pending → `insertText`. `KeyboardRecordingSpike` no longer used for the production flow. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.3 Fallback containing-app handoff flow | 🟥 Not started | Requires Phase 0 handoff and App Group assumptions to stay valid. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.4 Manual insert + unsupported-field fallback | 🟥 Not started | Covers `UITextDocumentProxy.insertText(...)`, Secure Fields, Phone Pads, disabled keyboards, and clipboard fallback. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.5 MVP onboarding, accessibility, and diagnostics baseline | 🟥 Not started | Covers activation flow, Open Access trade-off, VoiceOver labels, Dynamic Type baseline, and MetricKit surfacing. |
@@ -59,8 +59,8 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟧 In progress (shared model package wired; app and keyboard implementations pending) |
 | [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v2) | 🟧 In progress (`PendingInsert` shared-store handoff verified under contention; SwiftData history/vocabulary store pending) |
-| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v2) | 🟧 In progress (Apple Speech locale / on-device strategy evaluated; implementation pending) |
-| [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟧 In progress (keyboard UI state shell and shared insert-context planning rules implemented; host-app insertion pending) |
+| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v2) | 🟧 In progress (`SpeechEngine` protocol, `AppleSpeechEngine`, and MVP `PostProcessor` implemented; vocabulary and LLM pipeline pending Phase 2) |
+| [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟧 In progress (primary-flow dictation and basic `insertText` wired; Secure Field detection, clipboard fallback, and edge cases pending Phase 1.4) |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
 | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v2) | 🟥 Not started (dictation locale defaults clarified) |
 | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v3) | 🟨 Awaiting review (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written) |
