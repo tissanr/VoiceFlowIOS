@@ -1,8 +1,8 @@
 # Spec: Performance & Memory
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** Not started (budgets unverified, Phase 0 pending)
-> **Last updated:** 2026-04-28
+> **Implementation status:** Not started (budgets unverified; old-device Phase 0 recording pass skipped)
+> **Last updated:** 2026-05-19
 > **Owners:** iOS
 
 Numeric budgets. These are MVP exit criteria, not aspirational.
@@ -21,7 +21,7 @@ iOS terminates Keyboard Extensions that exceed roughly **48 MB** resident memory
 | History loaded in-extension | last 5 entries only | Full history lives only in the app. |
 | Speech recognition (primary flow) | measured in Phase 0 spike | If the spike shows we cannot stay under budget with live recognition, primary flow is restricted to capable device classes; affected users get the fallback flow. |
 
-**Phase 0 in-keyboard recording spike** must measure peak memory on real devices and produce a memory-budget verdict.
+The Phase 0 in-keyboard recording harness exists, but the old-device / borrowed-device hardware pass was skipped by product decision. The MVP must still meet these budgets before release; until measurements exist, primary in-keyboard recording remains an explicit risk and the containing-app fallback flow must stay first-class.
 
 ---
 
@@ -57,7 +57,7 @@ iOS terminates Keyboard Extensions that exceed roughly **48 MB** resident memory
 
 ## Validation
 
-- Phase 0 spike establishes preliminary numbers on the chosen iOS baseline.
+- Phase 0 provides the keyboard recording harness, but does not establish old-device memory numbers because that hardware pass was skipped.
 - Phase 1 acceptance requires meeting all targets on a representative device (iPhone 12 or newer).
 - Phase 4 re-validates all numbers on the **lowest-supported** device class. Deviations must be fixed or explicitly accepted with a written justification.
 
