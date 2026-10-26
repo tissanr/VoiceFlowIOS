@@ -1,8 +1,8 @@
 # Spec: Speech & Postprocessing
 
 > **Spec status:** Accepted (v2)
-> **Implementation status:** In progress (Apple Speech locale / on-device strategy evaluated; `SpeechEngine` implementation pending)
-> **Last updated:** 2026-05-15
+> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; real-device validation and partial-transcript persistence on interruption pending; postprocessing not started)
+> **Last updated:** 2026-10-25
 > **Owners:** iOS
 
 Audio session, speech recognition strategy, and the postprocessing pipeline that turns raw recognition into shippable text.

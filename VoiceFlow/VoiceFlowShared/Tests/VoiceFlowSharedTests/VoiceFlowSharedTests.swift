@@ -257,6 +257,134 @@ final class VoiceFlowSharedTests: XCTestCase {
         XCTAssertFalse(viewModel.primaryActionEnabled)
     }
 
+    func testKeyboardShellRecordingShowsPartialTranscript() {
+        let viewModel = KeyboardShellViewModel(state: .recording(elapsedSeconds: 3, partialText: " hello  there "))
+
+        XCTAssertEqual(viewModel.preview, "hello there")
+    }
+
+    func testKeyboardShellTranscribingWaitsForFinalResult() {
+        let viewModel = KeyboardShellViewModel(state: .transcribing(elapsedSeconds: 4))
+
+        XCTAssertFalse(viewModel.primaryActionEnabled)
+        XCTAssertEqual(viewModel.secondaryActionTitle, "Cancel")
+    }
+
+    func testKeyboardShellReviewingOffersInsert() {
+        let viewModel = KeyboardShellViewModel(state: .reviewing(preview: "Hello world.", elapsedSeconds: 4))
+
+        XCTAssertEqual(viewModel.primaryActionTitle, "Insert")
+        XCTAssertTrue(viewModel.primaryActionEnabled)
+    }
+
+    func testKeyboardShellDictationUnavailableOnlyRetriesRetryableErrors() {
+        let interrupted = KeyboardShellViewModel(state: .dictationUnavailable(error: .interrupted))
+        let denied = KeyboardShellViewModel(state: .dictationUnavailable(error: .microphonePermissionDenied))
+
+        XCTAssertEqual(interrupted.title, "Dictation Unavailable")
+        XCTAssertEqual(interrupted.primaryActionTitle, "Try Again")
+        XCTAssertTrue(interrupted.primaryActionEnabled)
+        XCTAssertFalse(denied.primaryActionEnabled)
+        XCTAssertEqual(denied.secondaryActionTitle, "Dismiss")
+    }
+
+    func testInsertVerifierDetectsSilentlyRejectedInsert() {
+        XCTAssertEqual(
+            InsertVerifier.verify(beforeInsert: "Hello", afterInsert: "Hello", insertedText: " world"),
+            .rejected
+        )
+        XCTAssertEqual(
+            InsertVerifier.verify(beforeInsert: "Hello", afterInsert: "Hello world", insertedText: " world"),
+            .inserted
+        )
+        XCTAssertEqual(
+            InsertVerifier.verify(beforeInsert: nil, afterInsert: "World", insertedText: "World"),
+            .inserted
+        )
+        XCTAssertEqual(
+            InsertVerifier.verify(beforeInsert: nil, afterInsert: nil, insertedText: "World"),
+            .unverifiable
+        )
+    }
+
+    func testSpeechLocaleResolverUsesExplicitDefaults() {
+        let current = Locale(identifier: "fr_FR")
+
+        XCTAssertEqual(
+            SpeechLocaleResolver.localeIdentifier(for: .german, currentLocale: current, supportedIdentifiers: []),
+            "de-DE"
+        )
+        XCTAssertEqual(
+            SpeechLocaleResolver.localeIdentifier(for: .english, currentLocale: current, supportedIdentifiers: []),
+            "en-US"
+        )
+    }
+
+    func testSpeechLocaleResolverAutomaticPrefersCurrentLocale() {
+        let supported: Set<String> = ["de-AT", "de-DE", "en-US", "en-GB"]
+
+        XCTAssertEqual(
+            SpeechLocaleResolver.localeIdentifier(for: .automatic, currentLocale: Locale(identifier: "de_AT"), supportedIdentifiers: supported),
+            "de-AT"
+        )
+        XCTAssertEqual(
+            SpeechLocaleResolver.localeIdentifier(for: .automatic, currentLocale: Locale(identifier: "en_GB@calendar=gregorian"), supportedIdentifiers: supported),
+            "en-GB"
+        )
+    }
+
+    func testSpeechLocaleResolverAutomaticFallsBackByLanguageThenEnglish() {
+        let supported: Set<String> = ["de_DE", "en-US", "fr-CA"]
+
+        XCTAssertEqual(
+            SpeechLocaleResolver.localeIdentifier(for: .automatic, currentLocale: Locale(identifier: "de_CH"), supportedIdentifiers: supported),
+            "de-DE"
+        )
+        XCTAssertEqual(
+            SpeechLocaleResolver.localeIdentifier(for: .automatic, currentLocale: Locale(identifier: "fr_FR"), supportedIdentifiers: supported),
+            "fr-CA"
+        )
+        XCTAssertEqual(
+            SpeechLocaleResolver.localeIdentifier(for: .automatic, currentLocale: Locale(identifier: "ja_JP"), supportedIdentifiers: supported),
+            "en-US"
+        )
+    }
+
+    func testSpeechPolicyPrefersOnDeviceWhenSupported() throws {
+        let capability = SpeechLocaleCapability(localeIdentifier: "de-DE", isSupported: true, isAvailable: true, supportsOnDeviceRecognition: true)
+
+        XCTAssertEqual(try SpeechRecognitionPolicy.recognitionMode(for: capability, settings: .defaults), .onDevice)
+    }
+
+    func testSpeechPolicyNeverDowngradesLocalOnlyToServer() {
+        let capability = SpeechLocaleCapability(localeIdentifier: "de-DE", isSupported: true, isAvailable: true, supportsOnDeviceRecognition: false)
+
+        XCTAssertThrowsError(try SpeechRecognitionPolicy.recognitionMode(for: capability, settings: .defaults)) { error in
+            XCTAssertEqual(error as? SpeechEngineError, .localOnlyUnavailable("de-DE"))
+        }
+    }
+
+    func testSpeechPolicyAllowsServerOnlyOutsideLocalOnlyMode() throws {
+        let capability = SpeechLocaleCapability(localeIdentifier: "de-DE", isSupported: true, isAvailable: true, supportsOnDeviceRecognition: false)
+        let settings = VoiceFlowSettings(preferOnDeviceSpeech: true, privacyMode: .externalLLMAllowed)
+
+        XCTAssertEqual(try SpeechRecognitionPolicy.recognitionMode(for: capability, settings: settings), .server)
+    }
+
+    func testSpeechPolicyFailsBeforeAudioForUnsupportedOrUnavailableLocale() {
+        let unsupported = SpeechLocaleCapability(localeIdentifier: "xx-XX", isSupported: false, isAvailable: false, supportsOnDeviceRecognition: false)
+        let unavailable = SpeechLocaleCapability(localeIdentifier: "de-DE", isSupported: true, isAvailable: false, supportsOnDeviceRecognition: true)
+
+        XCTAssertThrowsError(try SpeechRecognitionPolicy.recognitionMode(for: unsupported, settings: .defaults)) { error in
+            XCTAssertEqual(error as? SpeechEngineError, .localeUnsupported("xx-XX"))
+            XCTAssertFalse((error as? SpeechEngineError)?.isRetryable ?? true)
+        }
+        XCTAssertThrowsError(try SpeechRecognitionPolicy.recognitionMode(for: unavailable, settings: .defaults)) { error in
+            XCTAssertEqual(error as? SpeechEngineError, .recognizerUnavailable("de-DE"))
+            XCTAssertTrue((error as? SpeechEngineError)?.isRetryable ?? false)
+        }
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "VoiceFlowSharedTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
