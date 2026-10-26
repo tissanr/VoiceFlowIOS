@@ -11,8 +11,12 @@ import VoiceFlowShared
 final class KeyboardViewController: UIInputViewController {
     @IBOutlet var nextKeyboardButton: UIButton!
 
-    private let defaultSettings = VoiceFlowSettings.defaults
-    private let recordingSpike = KeyboardRecordingSpike()
+    private let settings = VoiceFlowSettings.defaults
+    private lazy var speechEngine: SpeechEngine = {
+        let engine = AppleSpeechEngine(settings: settings)
+        engine.delegate = self
+        return engine
+    }()
     private var sharedStoreClient: SharedStoreClient?
     private var pendingInsert: PendingInsert?
     private var shellState: KeyboardShellState = .compact(hasPendingInsert: false) {
@@ -20,6 +24,7 @@ final class KeyboardViewController: UIInputViewController {
     }
     private var recordingStartDate: Date?
     private var elapsedTimer: Timer?
+    /// Last dictated or pending text; the clipboard fallback copies this.
     private var latestReviewText = ""
 
     private let rootStackView = UIStackView()
@@ -36,8 +41,6 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        _ = defaultSettings
-        recordingSpike.delegate = self
         sharedStoreClient = try? SharedStoreClient()
         configureUI()
         if sharedStoreClient == nil {
@@ -55,14 +58,16 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        recordingSpike.recordLifecycleEvent("keyboard view appeared")
         refreshPendingInsert()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        recordingSpike.recordLifecycleEvent("keyboard view disappearing")
-        stopElapsedTimer()
+        // The keyboard must release the audio session before dismissal. Finish instead of
+        // cancelling so the dictated text is waiting in Review when the keyboard returns.
+        if case .recording = shellState {
+            stopRecording()
+        }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -213,7 +218,7 @@ final class KeyboardViewController: UIInputViewController {
     private func refreshPendingInsert() {
         guard let sharedStoreClient else {
             pendingInsert = nil
-            shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
+            showStoreUnavailableIfIdle()
             return
         }
 
@@ -221,7 +226,7 @@ final class KeyboardViewController: UIInputViewController {
             pendingInsert = try sharedStoreClient.pendingInsertForKeyboard()
         } catch {
             pendingInsert = nil
-            shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
+            showStoreUnavailableIfIdle()
             return
         }
 
@@ -230,61 +235,74 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
+    /// Store errors must not tear down an active dictation; only the idle UI reflects them.
+    private func showStoreUnavailableIfIdle() {
+        if case .compact = shellState {
+            shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
+        }
+    }
+
     private func startElapsedTimer() {
         recordingStartDate = Date()
         elapsedTimer?.invalidate()
         elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            self?.tickElapsedTime()
+            MainActor.assumeIsolated {
+                self?.tickElapsedTime()
+            }
         }
     }
 
     private func stopElapsedTimer() {
         elapsedTimer?.invalidate()
         elapsedTimer = nil
-        recordingStartDate = nil
     }
 
     private func tickElapsedTime() {
-        guard let recordingStartDate else { return }
-        let elapsedSeconds = max(0, Int(Date().timeIntervalSince(recordingStartDate)))
-
         switch shellState {
-        case .recording:
-            shellState = .recording(elapsedSeconds: elapsedSeconds)
+        case .recording(_, let partialText):
+            shellState = .recording(elapsedSeconds: elapsedSeconds, partialText: partialText)
         case .transcribing:
             shellState = .transcribing(elapsedSeconds: elapsedSeconds)
-        case .reviewing(let preview, _):
-            shellState = .reviewing(preview: preview, elapsedSeconds: elapsedSeconds)
         default:
             stopElapsedTimer()
         }
     }
 
+    private var elapsedSeconds: Int {
+        guard let recordingStartDate else { return 0 }
+        return max(0, Int(Date().timeIntervalSince(recordingStartDate)))
+    }
+
+    // MARK: - Actions
+
     @objc private func primaryActionTapped() {
         switch shellState {
-        case .compact:
-            guard hasFullAccess else {
-                shellState = .insertUnavailable(reason: .openAccessRequired)
-                return
-            }
-            startElapsedTimer()
-            shellState = .recording(elapsedSeconds: 0)
+        case .compact, .dictationUnavailable:
+            startDictation()
 
         case .recording:
-            shellState = .transcribing(elapsedSeconds: elapsedSeconds)
+            stopRecording()
 
         case .transcribing:
-            latestReviewText = pendingInsert?.text ?? "Preview text will appear here after transcription."
-            shellState = .reviewing(preview: latestReviewText, elapsedSeconds: elapsedSeconds)
+            break
 
-        case .reviewing(let preview, _):
-            stopElapsedTimer()
-            latestReviewText = preview
-            shellState = .pending(preview: preview)
+        case .reviewing(let text, _):
+            if insert(text) {
+                latestReviewText = ""
+                shellState = .compact(hasPendingInsert: pendingInsert != nil)
+            }
 
-        case .pending(let preview):
-            latestReviewText = preview
-            shellState = .compact(hasPendingInsert: pendingInsert != nil)
+        case .pending(let text):
+            guard let pendingInsert else {
+                shellState = .compact(hasPendingInsert: false)
+                return
+            }
+
+            if insert(text) {
+                consume(pendingInsert)
+                latestReviewText = ""
+                shellState = .compact(hasPendingInsert: self.pendingInsert != nil)
+            }
 
         case .insertUnavailable:
             if !latestReviewText.isEmpty {
@@ -303,27 +321,123 @@ final class KeyboardViewController: UIInputViewController {
             }
 
         case .pending:
-            guard discardPendingInsert() else { return }
-            pendingInsert = nil
+            if let pendingInsert {
+                guard consume(pendingInsert) else { return }
+            }
             latestReviewText = ""
             shellState = .compact(hasPendingInsert: false)
 
-        case .recording, .transcribing, .reviewing, .insertUnavailable:
+        case .recording, .transcribing:
+            stopElapsedTimer()
+            speechEngine.cancel()
+            shellState = .compact(hasPendingInsert: pendingInsert != nil)
+
+        case .reviewing, .insertUnavailable, .dictationUnavailable:
             stopElapsedTimer()
             shellState = .compact(hasPendingInsert: pendingInsert != nil)
         }
     }
 
-    private var elapsedSeconds: Int {
-        guard let recordingStartDate else { return 0 }
-        return max(0, Int(Date().timeIntervalSince(recordingStartDate)))
+    // MARK: - Dictation
+
+    private func startDictation() {
+        guard hasFullAccess else {
+            shellState = .insertUnavailable(reason: .openAccessRequired)
+            return
+        }
+
+        levelMeter.progress = 0
+        startElapsedTimer()
+        shellState = .recording(elapsedSeconds: 0)
+
+        let locale = AppleSpeechEngine.resolvedLocale(for: settings)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.speechEngine.start(locale: locale)
+                // The user may have cancelled while permissions were being requested.
+                guard case .recording = self.shellState else {
+                    self.speechEngine.cancel()
+                    return
+                }
+            } catch {
+                guard case .recording = self.shellState else { return }
+                self.showDictationError(error)
+            }
+        }
     }
 
-    private func discardPendingInsert() -> Bool {
-        guard let pendingInsert else { return true }
+    private func stopRecording() {
+        shellState = .transcribing(elapsedSeconds: elapsedSeconds)
 
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await self.speechEngine.stop()
+                guard case .transcribing = self.shellState else { return }
+                self.showReview(text: result.text, error: .recognitionFailed("No speech recognized"))
+            } catch SpeechEngineError.cancelled {
+                return
+            } catch {
+                guard case .transcribing = self.shellState else { return }
+                self.showDictationError(error)
+            }
+        }
+    }
+
+    private func showReview(text: String, error: SpeechEngineError) {
+        stopElapsedTimer()
+
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            shellState = .dictationUnavailable(error: error)
+            return
+        }
+
+        latestReviewText = text
+        shellState = .reviewing(preview: text, elapsedSeconds: elapsedSeconds)
+    }
+
+    private func showDictationError(_ error: Error) {
+        stopElapsedTimer()
+        shellState = .dictationUnavailable(error: (error as? SpeechEngineError) ?? .recognitionFailed(error.localizedDescription))
+    }
+
+    // MARK: - Insert
+
+    /// Inserts `text` with one `insertText` call (single undo step). Falls back to the
+    /// clipboard if the host silently drops the text. Returns whether the insert took.
+    private func insert(_ text: String) -> Bool {
+        let proxy = textDocumentProxy
+        let beforeInput = proxy.documentContextBeforeInput
+        let planned = InsertContextPlanner.plan(
+            text: text,
+            context: InsertContext(beforeInput: beforeInput, afterInput: proxy.documentContextAfterInput)
+        )
+
+        guard !planned.text.isEmpty else { return false }
+
+        proxy.insertText(planned.text)
+
+        switch InsertVerifier.verify(
+            beforeInsert: beforeInput,
+            afterInsert: proxy.documentContextBeforeInput,
+            insertedText: planned.text
+        ) {
+        case .inserted, .unverifiable:
+            return true
+        case .rejected:
+            UIPasteboard.general.string = text
+            latestReviewText = text
+            shellState = .insertUnavailable(reason: .unknown)
+            return false
+        }
+    }
+
+    @discardableResult
+    private func consume(_ pendingInsert: PendingInsert) -> Bool {
         do {
             try sharedStoreClient?.consumePendingInsert(generation: pendingInsert.generation)
+            self.pendingInsert = nil
             return true
         } catch {
             shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
@@ -332,15 +446,24 @@ final class KeyboardViewController: UIInputViewController {
     }
 }
 
-extension KeyboardViewController: KeyboardRecordingSpikeDelegate {
-    func keyboardRecordingSpikeDidUpdate(_ snapshot: KeyboardRecordingSpikeSnapshot) {
-        levelMeter.progress = snapshot.isRecording ? 0.72 : 0.18
+extension KeyboardViewController: SpeechEngineDelegate {
+    func speechEngine(_ engine: SpeechEngine, didUpdatePartialText text: String) {
+        guard case .recording(let elapsedSeconds, _) = shellState else { return }
+        latestReviewText = text
+        shellState = .recording(elapsedSeconds: elapsedSeconds, partialText: text)
+    }
 
-        guard !snapshot.transcript.isEmpty else { return }
-        latestReviewText = snapshot.transcript
+    func speechEngine(_ engine: SpeechEngine, didUpdateInputLevel level: Float) {
+        levelMeter.progress = level
+    }
 
-        if case .recording = shellState {
-            shellState = .reviewing(preview: snapshot.transcript, elapsedSeconds: elapsedSeconds)
+    func speechEngine(_ engine: SpeechEngine, didEndUnexpectedly error: SpeechEngineError, partialText: String) {
+        switch shellState {
+        case .recording, .transcribing:
+            // Never drop recognized text: let the user decide to insert or cancel.
+            showReview(text: partialText, error: error)
+        default:
+            break
         }
     }
 }

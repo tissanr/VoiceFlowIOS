@@ -2,11 +2,12 @@ import Foundation
 
 public enum KeyboardShellState: Equatable, Sendable {
     case compact(hasPendingInsert: Bool)
-    case recording(elapsedSeconds: Int)
+    case recording(elapsedSeconds: Int, partialText: String = "")
     case transcribing(elapsedSeconds: Int)
     case reviewing(preview: String, elapsedSeconds: Int)
     case pending(preview: String)
     case insertUnavailable(reason: InsertUnavailableReason)
+    case dictationUnavailable(error: SpeechEngineError)
 }
 
 public struct KeyboardShellViewModel: Equatable, Sendable {
@@ -31,10 +32,10 @@ public struct KeyboardShellViewModel: Equatable, Sendable {
             timerText = nil
             primaryActionEnabled = true
 
-        case .recording(let elapsedSeconds):
+        case .recording(let elapsedSeconds, let partialText):
             title = "Recording"
             detail = "Listening now."
-            preview = nil
+            preview = partialText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : Self.preview(partialText)
             primaryActionTitle = "Stop"
             secondaryActionTitle = "Cancel"
             showsLevelMeter = true
@@ -49,13 +50,13 @@ public struct KeyboardShellViewModel: Equatable, Sendable {
             secondaryActionTitle = "Cancel"
             showsLevelMeter = true
             timerText = Self.format(seconds: elapsedSeconds)
-            primaryActionEnabled = true
+            primaryActionEnabled = false
 
         case .reviewing(let text, let elapsedSeconds):
             title = "Review"
             detail = "Check the text before insert."
             preview = Self.preview(text)
-            primaryActionTitle = "Use Text"
+            primaryActionTitle = "Insert"
             secondaryActionTitle = "Cancel"
             showsLevelMeter = true
             timerText = Self.format(seconds: elapsedSeconds)
@@ -80,6 +81,16 @@ public struct KeyboardShellViewModel: Equatable, Sendable {
             showsLevelMeter = false
             timerText = nil
             primaryActionEnabled = reason.offersClipboardFallback
+
+        case .dictationUnavailable(let error):
+            title = "Dictation Unavailable"
+            detail = error.keyboardShellMessage
+            preview = nil
+            primaryActionTitle = "Try Again"
+            secondaryActionTitle = "Dismiss"
+            showsLevelMeter = false
+            timerText = nil
+            primaryActionEnabled = error.isRetryable
         }
     }
 
@@ -128,6 +139,33 @@ public extension InsertUnavailableReason {
             return true
         case .noPendingText, .unsupportedKeyboardType, .openAccessRequired:
             return false
+        }
+    }
+}
+
+public extension SpeechEngineError {
+    var keyboardShellMessage: String {
+        switch self {
+        case .microphonePermissionDenied:
+            return "Microphone access is off. Allow it for VoiceFlow in Settings."
+        case .speechPermissionDenied:
+            return "Speech recognition is off. Allow it for VoiceFlow in Settings."
+        case .localeUnsupported:
+            return "Speech recognition does not support this language."
+        case .recognizerUnavailable:
+            return "Speech recognition is unavailable right now."
+        case .localOnlyUnavailable:
+            return "On-device speech is not available for this language, and local-only mode is on."
+        case .audioInputUnavailable:
+            return "No microphone input is available."
+        case .interrupted:
+            return "Recording was interrupted."
+        case .cancelled:
+            return "Recording was cancelled."
+        case .recognitionFailed:
+            return "Speech recognition failed."
+        case .alreadyRecording, .notRecording:
+            return "Recording could not start."
         }
     }
 }

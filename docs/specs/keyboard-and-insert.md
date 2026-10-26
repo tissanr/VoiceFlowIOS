@@ -1,8 +1,8 @@
 # Spec: Keyboard & Insert
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** In progress (keyboard UI state shell and shared insert-context planning rules implemented; host-app insertion pending)
-> **Last updated:** 2026-05-19
+> **Implementation status:** In progress (keyboard UI state shell, primary-flow Dictate → Review → Insert, `InsertContextPlanner`, and `InsertVerifier` silent-rejection clipboard fallback implemented; `InsertGuard`, Inserted state, and host-app validation pending)
+> **Last updated:** 2026-10-25
 > **Owners:** iOS
 
 Keyboard UI states, insert path, and the boring edge cases that break custom keyboards.

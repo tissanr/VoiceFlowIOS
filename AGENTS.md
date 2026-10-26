@@ -98,23 +98,27 @@ For deeper design detail see [`docs/specs/architecture.md`](docs/specs/architect
 
 ## Current repository state
 
-The Xcode project **is scaffolded** at [`VoiceFlow/VoiceFlow.xcodeproj`](VoiceFlow/VoiceFlow.xcodeproj) with all four targets defined. Source files are stubs (default Xcode templates).
+The Xcode project **is scaffolded** at [`VoiceFlow/VoiceFlow.xcodeproj`](VoiceFlow/VoiceFlow.xcodeproj) with all four targets defined. The containing app is still a template stub; the keyboard extension and the shared package carry the implemented work. The per-subphase status lives in the [`ROADMAP.md`](ROADMAP.md) implementation table — treat that table as authoritative.
 
-What is **already wired up** from Phase 0 scaffold hardening:
+What is **already wired up**:
 
 - App Group entitlements (`.entitlements` files for both targets) using `group.me.tissanr.VoiceFlow.shared`.
 - `RequestsOpenAccess = true` in [`VoiceFlow/VoiceFlowKeyboard/Info.plist`](VoiceFlow/VoiceFlowKeyboard/Info.plist).
-- Extension-safe local Swift package [`VoiceFlow/VoiceFlowShared`](VoiceFlow/VoiceFlowShared) with shared model types.
-- `PendingInsert` `SharedStoreClient` using the generation-counter concurrency protocol.
+- Extension-safe local Swift package [`VoiceFlow/VoiceFlowShared`](VoiceFlow/VoiceFlowShared) with shared model types. All shared types live there; do not re-declare them in app or extension targets.
+- `PendingInsert` `SharedStoreClient` using the generation-counter concurrency protocol. It is the only allowed App Group access path.
+- `InsertContextPlanner` / `InsertVerifier` insert rules.
+- `SpeechEngine` protocol, locale resolution, recognition policy, and the iOS-only `AppleSpeechEngine` (Phase 1.2).
+- Keyboard state shell plus the primary in-keyboard dictation flow (Phase 1.2).
 
-What is **not yet** wired up (remaining Phase 0 prerequisites — see [`ROADMAP.md`](ROADMAP.md) → Phase 0):
+What is **not yet** wired up:
 
-- `SpeechEngine` protocol and `AppleSpeechEngine`.
-- `PostProcessor` rule pipeline.
+- Containing-app fallback recording flow (Phase 1.3).
+- `InsertGuard` Secure Field / Phone Pad detection (Phase 1.4).
+- `PostProcessor` rule pipeline (Phase 2.1).
 - Onboarding screens.
-- SwiftData history/vocabulary storage and implementation code beyond Phase 0 foundation pieces.
+- SwiftData history/vocabulary storage.
 
-Do not skip Phase 0. The roadmap is gated.
+Phase 0 items still open (0.6 manual device matrices, 0.7 human review) do not block Phase 1 by product decision; see [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -178,4 +182,4 @@ When making technical decisions, respect these iOS constraints:
 7. Run the spikes listed in [`ROADMAP.md`](ROADMAP.md) → Phase 0. Each produces a written verdict.
 8. Draft privacy nutrition label, App Review narrative, and onboarding copy.
 
-Anything beyond this list is Phase 1+ and waits for Phase 0 sign-off.
+Phase 1 work has been allowed to proceed while Phase 0 manual device checks (0.6) and human review (0.7) remain open; the fallback flow stays first-class until those land.
