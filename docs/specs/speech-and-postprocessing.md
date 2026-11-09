@@ -1,7 +1,7 @@
 # Spec: Speech & Postprocessing
 
 > **Spec status:** Accepted (v3)
-> **Implementation status:** In progress (Apple Speech locale / on-device strategy evaluated; engine choice reopened for the Phase 2.0 WER benchmark; staged postprocessing defined; `SpeechEngine` implementation pending)
+> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; real-device validation and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark; staged postprocessing defined, not started)
 > **Last updated:** 2026-11-09
 > **Owners:** iOS
 

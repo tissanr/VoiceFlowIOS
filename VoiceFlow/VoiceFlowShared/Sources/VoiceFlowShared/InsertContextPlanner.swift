@@ -96,6 +96,31 @@ public enum InsertContextPlanner {
     }
 }
 
+public enum InsertVerificationResult: Equatable, Sendable {
+    case inserted
+    /// The host exposes no context, so the insert cannot be confirmed either way.
+    case unverifiable
+    /// Context before the cursor is unchanged; the field silently dropped the text.
+    case rejected
+}
+
+public enum InsertVerifier {
+    public static func verify(beforeInsert: String?, afterInsert: String?, insertedText: String) -> InsertVerificationResult {
+        guard !insertedText.isEmpty else {
+            return .inserted
+        }
+
+        switch (beforeInsert, afterInsert) {
+        case (nil, nil):
+            return .unverifiable
+        case let (before?, after?) where before == after:
+            return .rejected
+        default:
+            return .inserted
+        }
+    }
+}
+
 private extension String {
     var firstNonWhitespaceCharacter: Character? {
         first { !$0.isWhitespace }
