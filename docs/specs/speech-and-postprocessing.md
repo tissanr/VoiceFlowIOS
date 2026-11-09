@@ -1,8 +1,8 @@
 # Spec: Speech & Postprocessing
 
-> **Spec status:** Accepted (v2)
-> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; real-device validation and partial-transcript persistence on interruption pending; postprocessing not started)
-> **Last updated:** 2026-10-25
+> **Spec status:** Accepted (v3)
+> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; real-device validation and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark; staged postprocessing defined, not started)
+> **Last updated:** 2026-11-09
 > **Owners:** iOS
 
 Audio session, speech recognition strategy, and the postprocessing pipeline that turns raw recognition into shippable text.
@@ -22,7 +22,7 @@ Audio session, speech recognition strategy, and the postprocessing pipeline that
 
 ## Speech engine
 
-VoiceFlow uses Apple's Speech framework first. Whisper / Core ML remains a later alternative if Apple Speech is insufficient for quality, offline availability, mixed-language dictation, or privacy. The Phase 0 Speech verdict is documented in [../spikes/apple-speech-locale-availability.md](../spikes/apple-speech-locale-availability.md).
+VoiceFlow uses Apple's Speech framework (`SFSpeechRecognizer`) for the MVP. The final engine choice is made by the Phase 2.0 ASR quality benchmark, which measures WER on a fixed German / English / mixed corpus across Apple Speech, iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit, and Parakeet. Non-Apple engines are integrated in Phase 5 only if the benchmark shows a clear advantage, and run in the containing app only. The Phase 0 Speech verdict is documented in [../spikes/apple-speech-locale-availability.md](../spikes/apple-speech-locale-availability.md).
 
 ```swift
 protocol SpeechEngine {
@@ -36,7 +36,9 @@ protocol SpeechEngine {
 | --- | --- | --- | --- |
 | Apple Speech Framework | Fast MVP, native API, low ML complexity | Own recording required, system behavior not fully controllable | **MVP default** |
 | Apple Speech On-Device | Local without a custom model | Availability depends on language / device / iOS version | Validate in Phase 0; check `supportsOnDeviceRecognition` per locale |
-| Whisper / Core ML | Full control, consistent offline story | Model size, battery, memory, latency, conversion work | Phase 5 only with proven need |
+| Apple `SpeechAnalyzer` / `SpeechTranscriber` (iOS 26) | System model, no bundle cost, works in extension memory budget | iOS 26 only; German quality unverified | Benchmark in Phase 2.0 |
+| WhisperKit `large-v3-turbo` (Core ML) | Expected stronger German accuracy (to be measured); vocabulary via initial prompt | Large model (size measured in 2.0), recent devices only, containing app only | Benchmark in Phase 2.0; Phase 5 if it wins |
+| Parakeet TDT v3 (FluidAudio / Core ML) | Very fast; 25 European languages incl. German | German quality unverified; containing app only | Benchmark in Phase 2.0 |
 
 ### Locale handling
 
@@ -49,13 +51,14 @@ protocol SpeechEngine {
 
 ## Postprocessing pipeline
 
-VoiceFlow differentiates primarily through text quality after recognition, not through the recognition itself.
+VoiceFlow differentiates through final text quality. Errors are fixed at the source first (vocabulary passed into recognition, engine chosen by measured WER); postprocessing then corrects what recognition still gets wrong.
 
 ```text
-Speech raw text
-  -> apply known correction pairs (vocabulary)
-  -> normalize punctuation, whitespace, capitalization
-  -> apply correction-level rules (or LLM, if enabled)
+Vocabulary passed into recognition (contextualStrings / custom LM / Whisper prompt)
+  -> Speech raw text
+  -> Stage 1 (deterministic): apply known correction pairs, normalize punctuation, whitespace, capitalization
+  -> Stage 2 (optional LLM, on-device): punctuation, casing, filler words, spoken self-corrections only; short segments; guided generation
+  -> Stage 3 (optional): LLM picks between engine alternatives instead of free correction
   -> guardrails (deviation / similarity / repetition)
   -> final text
   -> learn new correction pairs from any user post-edit
@@ -89,7 +92,12 @@ The guardrail thresholds are tuning parameters; pick conservative defaults in MV
 
 ### Vocabulary
 
-Apple Speech cannot be controlled with a free-form initial prompt like Whisper. Vocabulary is therefore applied **after** recognition. New correction pairs are learned from user post-edits in the review screen, never silently in the background.
+Vocabulary is applied at two points:
+
+1. **At recognition time** — Apple Speech has no free-form prompt, but accepts `contextualStrings` on the recognition request and custom language models (`SFCustomLanguageModelData`, iOS 17+). Whisper takes an initial prompt with the glossary.
+2. **After recognition** — deterministic correction pairs in Stage 1.
+
+Errors fixed at the source beat errors fixed by an LLM, which can only guess. New correction pairs are learned from user post-edits in the review screen, never silently in the background.
 
 ---
 

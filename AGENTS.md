@@ -141,7 +141,7 @@ When making technical decisions, respect these iOS constraints:
 - Swift + SwiftUI for the containing app.
 - UIKit + `UIInputViewController` for the Keyboard Extension (SwiftUI-hosted views are acceptable where they remain stable inside extensions).
 - Extension-safe shared code lives in its own framework / Swift package; app-only code stays in `VoiceFlow`.
-- Apple Speech first. Whisper / Core ML is a **Phase 5** item, only if proven needed.
+- Apple Speech (`SFSpeechRecognizer`) is the MVP engine. The final engine choice is decided by the Phase 2.0 ASR quality benchmark (WER on a fixed German / English corpus: Apple Speech, iOS 26 `SpeechAnalyzer`, WhisperKit, Parakeet). Non-Apple engines (WhisperKit / Parakeet via Core ML) are **Phase 5** items, gated by that benchmark, and run in the containing app only — never in the Keyboard Extension. See [`docs/specs/speech-and-postprocessing.md`](docs/specs/speech-and-postprocessing.md).
 - Manual Insert in MVP. Auto-insert is post-MVP.
 - Use Apple's MetricKit for crash / diagnostic reporting unless Phase 0 explicitly approves a third-party choice.
 - Add tests around state models, shared store behavior, postprocessing, and insert-context rules as code lands.
