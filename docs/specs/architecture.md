@@ -236,7 +236,7 @@ Current shared package path: [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/V
 | Persistence | SwiftData in the App Group container for history and vocabulary |
 | Extension comms | App Groups + locked suite preferences + SwiftData |
 | Shortcuts | App Intents |
-| Later offline ASR | Whisper / Core ML or whisper.cpp / Metal |
+| Later offline ASR | WhisperKit or Parakeet via Core ML (containing app only; chosen by Phase 2.0 benchmark) |
 
 ---
 
