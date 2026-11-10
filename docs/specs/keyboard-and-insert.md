@@ -1,8 +1,8 @@
 # Spec: Keyboard & Insert
 
 > **Spec status:** Accepted (v1)
-> **Implementation status:** In progress (keyboard UI state shell, primary-flow Dictate → Review → Insert, `InsertContextPlanner`, and `InsertVerifier` silent-rejection clipboard fallback implemented; `InsertGuard`, Inserted state, and host-app validation pending)
-> **Last updated:** 2026-10-25
+> **Implementation status:** In progress (keyboard UI state shell, primary-flow Dictate → Review → Insert, `InsertContextPlanner`, `InsertVerifier` silent-rejection clipboard fallback, vocabulary hints / correction, history write, and post-edit learning implemented; `InsertGuard`, Inserted state, and host-app validation pending)
+> **Last updated:** 2026-11-10
 > **Owners:** iOS
 
 Keyboard UI states, insert path, and the boring edge cases that break custom keyboards.
@@ -39,6 +39,16 @@ Phase 0 context-rule coverage lives in [../spikes/insert-and-context.md](../spik
 - Set `DictationRecord.insertedAt`.
 - Set keyboard UI to **Inserted**.
 - **Verify the insert took:** re-read `documentContextBeforeInput`. If unchanged, the field rejected the insert silently — fall back to clipboard with explanation.
+
+### Learning from post-edits
+
+Users fix dictated text with another keyboard, since VoiceFlow has no letter keys. The keyboard notices those fixes when it becomes active again:
+
+1. After a successful insert, the keyboard stores a `KeyboardEditWatch` (dictation ID, inserted text, time) in the App Group — persisted because iOS usually terminates the extension while another keyboard is active.
+2. On `viewDidAppear`, if a watch exists and is younger than 15 minutes, it reads `documentContextBeforeInput` + `documentContextAfterInput` and asks `VocabularyLearner.editedSegment` for the stretch that resembles the inserted text (≥ 60 % of its words).
+3. Unchanged text or an unrelated field → keep watching until the watch expires. A changed stretch → learn candidate pairs from inserted vs. edited text, store them as vocabulary **suggestions**, set `DictationRecord.editedText`, clear the watch, and show a one-line notice in the idle state.
+
+Only the inserted text and its edited counterpart are kept; the rest of the host field's context is read transiently and never stored. Disabled with `learnFromKeyboardEdits = false`. Privacy sign-off: see [privacy-and-app-review.md](privacy-and-app-review.md).
 
 ### Fallback (clipboard)
 

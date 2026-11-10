@@ -13,5 +13,9 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VoiceFlow needs microphone access to record your dictation.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>VoiceFlow uses speech recognition to transcribe your dictation.</string>
 </dict>
 </plist>
