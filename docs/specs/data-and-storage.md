@@ -1,8 +1,8 @@
 # Spec: Data & Storage
 
-> **Spec status:** Accepted (v2)
-> **Implementation status:** In progress (App Group entitlements, shared model package, and `PendingInsert` `SharedStoreClient` verified under contention; SwiftData history/vocabulary store pending)
-> **Last updated:** 2026-04-29
+> **Spec status:** Accepted (v3) — v3 moves history and vocabulary from SwiftData to locked JSON file stores and adds vocabulary status/source fields
+> **Implementation status:** In progress (App Group entitlements, shared model package, `PendingInsert` `SharedStoreClient` verified under contention; JSON file stores for vocabulary, history, settings, and keyboard edit watch implemented; real-device App Group validation pending)
+> **Last updated:** 2026-11-10
 > **Owners:** iOS
 
 Models, the App Group store layout, and the cross-process concurrency protocol that connects the containing app to the Keyboard Extension.
@@ -26,14 +26,15 @@ The App Group ID must match in both targets' `.entitlements`, in `SharedStoreCli
 | Data | Storage | Reason |
 | --- | --- | --- |
 | `PendingInsert`, `KeyboardState`, generation counter | App Group suite preferences via `SharedStoreClient` | `PendingInsert` uses a shared App Group file lock plus explicit suite synchronization; do not access its raw keys directly. |
-| `DictationRecord` (history) | SwiftData in the App Group container | Higher volume than `PendingInsert`; selected by the Phase 0 min-iOS investigation. |
-| `VocabularyEntry` | SwiftData in the App Group container | Indexed lookup needed for postprocessing. |
-| `VoiceFlowSettings` | App Group suite preferences (subset readable from extension) | Small, hot, atomic. |
+| `DictationRecord` (history) | `DictationHistoryStore`: `Stores/history.json` in the App Group container, newest first, capped at 100 | Written by both processes; small; whole-file atomic writes survive extension termination. |
+| `VocabularyEntry` | `VocabularyStore`: `Stores/vocabulary.json` in the App Group container | Read by the keyboard at dictation start; hundreds of entries at most, so a linear scan is enough. |
+| `KeyboardEditWatch` | `KeyboardEditWatchStore`: `Stores/keyboard-edit-watch.json` | Last keyboard insertion, kept so a later post-edit can be learned after iOS terminated the extension. |
+| `VoiceFlowSettings` | App Group suite preferences, key `settings.v1` (JSON) via `SettingsStore` | Small, hot, atomic; missing keys decode to defaults. |
 | Diagnostic ring buffer | Shared file in the App Group container | Local-only, no network telemetry. |
 
 The Keyboard Extension never opens the heavy store at launch; it only opens App Group suite preferences and lazy-loads the items it needs (last 5 history entries, vocabulary subset). See [performance-and-memory.md](performance-and-memory.md).
 
-The SwiftData decision is documented in [../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md). The `PendingInsert` contention verdict is documented in [../spikes/app-group-store-contention.md](../spikes/app-group-store-contention.md). If later SwiftData validation shows history/vocabulary access is unreliable for app/extension access patterns, switch history and vocabulary to shared SQLite before Phase 1.
+The JSON file stores share one helper, `SharedJSONFileStore`: every read and read-modify-write runs under an `flock` on a sibling `.lock` file (the same lock primitive `SharedStoreClient` uses), and writes are atomic file replacements. **v3 change:** the Phase 0 min-iOS investigation ([../spikes/min-ios-investigation.md](../spikes/min-ios-investigation.md)) had selected SwiftData for history and vocabulary. History is capped at 100 records and vocabulary stays in the hundreds, so a locked JSON file is simpler, costs the keyboard no SwiftData stack in its ~48 MB budget, and is unit-testable from the Swift package on macOS. Revisit (SwiftData or shared SQLite) if history needs search or grows past a few hundred KB. The `PendingInsert` contention verdict is documented in [../spikes/app-group-store-contention.md](../spikes/app-group-store-contention.md).
 
 The extension-safe model definitions and `PendingInsert` shared-store client live in the local Swift package at [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/VoiceFlowShared).
 
@@ -94,6 +95,7 @@ struct DictationRecord: Codable, Identifiable {
     var accuracyRatio: Double?
     var state: DictationState
     var insertedAt: Date?
+    var editedText: String?      // user's correction from History or a detected keyboard post-edit
 }
 ```
 
@@ -121,14 +123,19 @@ enum ProducerSide: String, Codable {
 ```swift
 struct VocabularyEntry: Codable, Identifiable {
     let id: UUID
-    var heard: String
+    var heard: String            // empty = plain term (recognition hint only)
     var correction: String
     var isEnabled: Bool
     var createdAt: Date
     var lastUsedAt: Date?
     var useCount: Int
+    var status: VocabularyStatus // .suggested | .active | .rejected
+    var source: VocabularySource // .manual | .historyEdit | .keyboardEdit
+    var timesObserved: Int       // how often a learned pair was seen
 }
 ```
+
+Only `.active` + enabled entries affect recognition and correction. Learned pairs start as `.suggested`; `.rejected` entries are kept so the same pair is not suggested again. Decoding tolerates missing new keys.
 
 ### Settings
 

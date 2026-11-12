@@ -8,6 +8,7 @@ import Speech
 @MainActor
 public final class AppleSpeechEngine: SpeechEngine {
     public weak var delegate: SpeechEngineDelegate?
+    public var contextualStrings: [String] = []
 
     private let settings: VoiceFlowSettings
     private let finalResultTimeout: Duration
@@ -113,6 +114,7 @@ public final class AppleSpeechEngine: SpeechEngine {
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
         request.requiresOnDeviceRecognition = mode == .onDevice
+        request.contextualStrings = Array(contextualStrings.prefix(VocabularyCorrector.maxRecognitionHints))
 
         sessionID += 1
         let currentSessionID = sessionID
