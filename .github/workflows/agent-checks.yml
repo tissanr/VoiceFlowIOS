@@ -1,0 +1,18 @@
+# Runs the agent-neutral guardrail checks for everyone (humans and agents).
+# Rules: docs/specs/agent-tooling.md
+
+name: Agent checks
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run guardrail checks
+      run: scripts/agent-checks/run-all.sh --all
