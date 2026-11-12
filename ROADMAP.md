@@ -1,6 +1,6 @@
 # VoiceFlow iOS — Roadmap
 
-> **Last updated:** 2026-11-09
+> **Last updated:** 2026-11-12
 > **Purpose:** Index of specifications, implementation status, and phase plan. The detailed product spec lives in [`docs/specs/`](docs/specs/) — start there for any deep dive.
 
 ---
@@ -67,6 +67,7 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v3) | 🟨 Awaiting review (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written) |
 | [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v3) | 🟧 In progress (GitHub Actions Swift package workflow path fixed; Xcode app build CI pending) |
 | [testing](docs/specs/testing.md) | Phase 0 spike tests, required iOS test versions, MVP acceptance tests, Phase 4 regression matrix | Accepted (v2) | 🟧 In progress (`VoiceFlowShared` tests and App Group contention spike harness exist) |
+| [agent-tooling](docs/specs/agent-tooling.md) | Dev-only: guardrail checks for coding agents, agent-neutral roles and workflows, Claude Code hooks/adapters, CI guardrail job | Accepted (v1) | 🟧 In progress (checks, three roles, two workflows, hooks, CI job landed; `spike-verdict` workflow and sim-runner role pending) |
 
 **Status legend:** 🟥 Not started · 🟧 In progress · 🟨 Awaiting review · 🟩 Done · ⬛ Superseded
 
