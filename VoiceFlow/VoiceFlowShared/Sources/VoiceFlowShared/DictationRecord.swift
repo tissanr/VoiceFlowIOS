@@ -14,6 +14,8 @@ public struct DictationRecord: Codable, Equatable, Identifiable, Sendable {
     public var accuracyRatio: Double?
     public var state: DictationState
     public var insertedAt: Date?
+    /// The user's corrected version, set when they edit the dictation in History.
+    public var editedText: String?
 
     public init(
         id: DictationID = DictationID(),
@@ -26,7 +28,8 @@ public struct DictationRecord: Codable, Equatable, Identifiable, Sendable {
         wordCount: Int,
         accuracyRatio: Double? = nil,
         state: DictationState,
-        insertedAt: Date? = nil
+        insertedAt: Date? = nil,
+        editedText: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -39,6 +42,12 @@ public struct DictationRecord: Codable, Equatable, Identifiable, Sendable {
         self.accuracyRatio = accuracyRatio
         self.state = state
         self.insertedAt = insertedAt
+        self.editedText = editedText
+    }
+
+    /// The best available text: the user's edit, else the postprocessed text.
+    public var finalText: String {
+        editedText ?? processedText
     }
 }
 

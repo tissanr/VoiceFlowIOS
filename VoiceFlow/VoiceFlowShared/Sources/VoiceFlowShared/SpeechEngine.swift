@@ -4,6 +4,8 @@ import Foundation
 public protocol SpeechEngine: AnyObject {
     var delegate: SpeechEngineDelegate? { get set }
     var isRecording: Bool { get }
+    /// Vocabulary terms that bias recognition for the next `start`. Engines may cap or ignore them.
+    var contextualStrings: [String] { get set }
 
     func requestPermissions() async throws
     func start(locale: Locale) async throws

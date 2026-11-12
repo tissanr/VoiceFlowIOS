@@ -16,7 +16,7 @@ The keyboard spike UI now exposes:
 - An "Open VoiceFlow" action that calls `extensionContext?.open(URL(string: "voiceflow://record")!)`.
 - A visible success / failure result for the open-URL attempt.
 
-The containing app now registers the `voiceflow://` URL scheme and displays the last opened URL in the scaffold UI. This makes the open-URL attempt observable instead of relying on console output.
+The containing app now registers the `voiceflow://` URL scheme; opening it switches to the Dictate tab and shows the last opened URL under Settings › Diagnostics. This makes the open-URL attempt observable instead of relying on console output.
 
 ## Current automated findings
 

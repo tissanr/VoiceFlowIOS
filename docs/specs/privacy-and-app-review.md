@@ -2,7 +2,7 @@
 
 > **Spec status:** Accepted (v3)
 > **Implementation status:** In progress (`RequestsOpenAccess` enabled; Open Access behavior harness wired; MetricKit selected; privacy / App Review / onboarding draft written, human review pending)
-> **Last updated:** 2026-05-15
+> **Last updated:** 2026-11-10
 > **Owners:** product + iOS
 
 Permissions, privacy posture, telemetry, and the App Store Review narrative. App-Review-sensitive — read before changing user-facing wording.
@@ -20,6 +20,8 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 ### Permission copy
 
 `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` strings are **App-Review-sensitive**. Wording must match the actual behavior described in this spec; reviewers compare them against runtime usage. Do not tweak in passing.
+
+The containing app now also declares both strings (for in-app dictation in the Dictate tab), using the same wording as the keyboard extension. Both copies are still unreviewed.
 
 Draft permission-string direction lives in [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). It is not final shipping copy until human review signs it off.
 
@@ -39,7 +41,7 @@ Draft permission-string direction lives in [../spikes/privacy-app-review-onboard
 - **No audio storage** in the MVP except for explicit, opt-in debugging.
 - **Raw and final text** remain local unless an external LLM mode is enabled. External LLM is **off by default** and gated on a separate explicit privacy review.
 - If external LLM is enabled, the active mode must be visible and disableable from the main UI. Audio is **never** sent to a remote LLM — only post-recognition text.
-- The Keyboard Extension reads only the data it needs for insert / favorites.
+- The Keyboard Extension reads only the data it needs for insert / favorites, and — when *Learn from corrections in other apps* is on (default) — the host field's context around text VoiceFlow itself inserted, to detect the user's correction of it. Only the inserted text and its corrected counterpart are stored, locally. **Needs human privacy review** before release (default on vs. off, Settings copy, nutrition label impact). See [keyboard-and-insert.md](keyboard-and-insert.md) → *Learning from post-edits*.
 - Secure Fields are not bypassed.
 - **No silent network telemetry.** All diagnostics stay local in the App Group store unless the user opts in to share with support.
 

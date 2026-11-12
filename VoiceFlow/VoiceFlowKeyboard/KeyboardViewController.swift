@@ -11,13 +11,19 @@ import VoiceFlowShared
 final class KeyboardViewController: UIInputViewController {
     @IBOutlet var nextKeyboardButton: UIButton!
 
-    private let settings = VoiceFlowSettings.defaults
-    private lazy var speechEngine: SpeechEngine = {
-        let engine = AppleSpeechEngine(settings: settings)
-        engine.delegate = self
-        return engine
-    }()
+    private var settings = VoiceFlowSettings.defaults
+    /// Created per dictation so it always uses the current settings and vocabulary.
+    private var speechEngine: AppleSpeechEngine?
     private var sharedStoreClient: SharedStoreClient?
+    private var vocabularyStore: VocabularyStore?
+    private var historyStore: DictationHistoryStore?
+    private var editWatchStore: KeyboardEditWatchStore?
+    /// Vocabulary loaded at dictation start; applied to the result before review.
+    private var vocabulary: [VocabularyEntry] = []
+    private var currentRecord: DictationRecord?
+    private var editWatch: KeyboardEditWatch?
+    /// One-off message in the idle state, e.g. after learning from an edit.
+    private var notice: String?
     private var pendingInsert: PendingInsert?
     private var shellState: KeyboardShellState = .compact(hasPendingInsert: false) {
         didSet { render() }
@@ -42,6 +48,11 @@ final class KeyboardViewController: UIInputViewController {
         super.viewDidLoad()
 
         sharedStoreClient = try? SharedStoreClient()
+        vocabularyStore = try? VocabularyStore.appGroup()
+        historyStore = try? DictationHistoryStore.appGroup()
+        editWatchStore = try? KeyboardEditWatchStore.appGroup()
+        settings = (try? SettingsStore.appGroup())?.load() ?? .defaults
+        editWatch = try? editWatchStore?.current()
         configureUI()
         if sharedStoreClient == nil {
             shellState = .insertUnavailable(reason: .sharedStoreUnavailable)
@@ -58,7 +69,11 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        if speechEngine?.isRecording != true {
+            settings = (try? SettingsStore.appGroup())?.load() ?? settings
+        }
         refreshPendingInsert()
+        learnFromPostEdit()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -181,7 +196,11 @@ final class KeyboardViewController: UIInputViewController {
 
         let viewModel = KeyboardShellViewModel(state: shellState)
         titleLabel.text = viewModel.title
-        detailLabel.text = viewModel.detail
+        if case .compact = shellState, let notice {
+            detailLabel.text = notice
+        } else {
+            detailLabel.text = viewModel.detail
+        }
         accessBadgeLabel.text = hasFullAccess ? "Full Access" : "Handoff Mode"
         previewLabel.text = viewModel.preview
         previewLabel.isHidden = viewModel.preview == nil
@@ -276,6 +295,7 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - Actions
 
     @objc private func primaryActionTapped() {
+        notice = nil
         switch shellState {
         case .compact, .dictationUnavailable:
             startDictation()
@@ -287,7 +307,8 @@ final class KeyboardViewController: UIInputViewController {
             break
 
         case .reviewing(let text, _):
-            if insert(text) {
+            if let inserted = insert(text) {
+                didInsertDictation(inserted)
                 latestReviewText = ""
                 shellState = .compact(hasPendingInsert: pendingInsert != nil)
             }
@@ -298,7 +319,7 @@ final class KeyboardViewController: UIInputViewController {
                 return
             }
 
-            if insert(text) {
+            if insert(text) != nil {
                 consume(pendingInsert)
                 latestReviewText = ""
                 shellState = .compact(hasPendingInsert: self.pendingInsert != nil)
@@ -313,6 +334,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func secondaryActionTapped() {
+        notice = nil
         switch shellState {
         case .compact:
             if let pendingInsert {
@@ -329,7 +351,7 @@ final class KeyboardViewController: UIInputViewController {
 
         case .recording, .transcribing:
             stopElapsedTimer()
-            speechEngine.cancel()
+            speechEngine?.cancel()
             shellState = .compact(hasPendingInsert: pendingInsert != nil)
 
         case .reviewing, .insertUnavailable, .dictationUnavailable:
@@ -350,14 +372,20 @@ final class KeyboardViewController: UIInputViewController {
         startElapsedTimer()
         shellState = .recording(elapsedSeconds: 0)
 
+        vocabulary = (try? vocabularyStore?.entries()) ?? []
+        let engine = AppleSpeechEngine(settings: settings)
+        engine.delegate = self
+        engine.contextualStrings = VocabularyCorrector.recognitionHints(from: vocabulary)
+        speechEngine = engine
+
         let locale = AppleSpeechEngine.resolvedLocale(for: settings)
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await self.speechEngine.start(locale: locale)
+                try await engine.start(locale: locale)
                 // The user may have cancelled while permissions were being requested.
                 guard case .recording = self.shellState else {
-                    self.speechEngine.cancel()
+                    engine.cancel()
                     return
                 }
             } catch {
@@ -373,9 +401,15 @@ final class KeyboardViewController: UIInputViewController {
         Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await self.speechEngine.stop()
+                guard let engine = self.speechEngine else { return }
+                let result = try await engine.stop()
                 guard case .transcribing = self.shellState else { return }
-                self.showReview(text: result.text, error: .recognitionFailed("No speech recognized"))
+                self.showReview(
+                    text: result.text,
+                    localeIdentifier: result.localeIdentifier,
+                    durationMs: result.durationMs,
+                    error: .recognitionFailed("No speech recognized")
+                )
             } catch SpeechEngineError.cancelled {
                 return
             } catch {
@@ -385,16 +419,88 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    private func showReview(text: String, error: SpeechEngineError) {
+    private func showReview(text: String, localeIdentifier: String? = nil, durationMs: Int? = nil, error: SpeechEngineError) {
         stopElapsedTimer()
 
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let raw = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else {
             shellState = .dictationUnavailable(error: error)
             return
         }
 
-        latestReviewText = text
-        shellState = .reviewing(preview: text, elapsedSeconds: elapsedSeconds)
+        let corrected = VocabularyCorrector.apply(vocabulary, to: raw)
+        try? vocabularyStore?.recordUse(of: corrected.appliedEntryIDs)
+        let record = DictationRecord(
+            sourceLocale: localeIdentifier ?? AppleSpeechEngine.resolvedLocale(for: settings).identifier,
+            rawText: raw,
+            processedText: corrected.text,
+            correctionLevel: settings.correctionLevel,
+            durationMs: durationMs ?? elapsedSeconds * 1_000,
+            wordCount: corrected.text.split(whereSeparator: \.isWhitespace).count,
+            state: .readyForReview
+        )
+        currentRecord = record
+        try? historyStore?.upsert(record)
+
+        latestReviewText = corrected.text
+        shellState = .reviewing(preview: corrected.text, elapsedSeconds: elapsedSeconds)
+    }
+
+    // MARK: - Learning
+
+    private func didInsertDictation(_ insertedText: String) {
+        guard var record = currentRecord else { return }
+        record.state = .inserted
+        record.insertedAt = Date()
+        try? historyStore?.upsert(record)
+        currentRecord = nil
+
+        guard settings.learnFromKeyboardEdits else { return }
+        let watch = KeyboardEditWatch(
+            dictationID: record.id,
+            insertedText: insertedText.trimmingCharacters(in: .whitespacesAndNewlines),
+            insertedAt: Date()
+        )
+        editWatch = watch
+        try? editWatchStore?.set(watch)
+    }
+
+    /// When the keyboard comes back after the user edited our insertion with another keyboard,
+    /// compare the edit with what we inserted and store new vocabulary suggestions.
+    /// Only the inserted text and its edited counterpart are used; nothing else is kept.
+    private func learnFromPostEdit() {
+        guard let watch = editWatch else { return }
+        guard settings.learnFromKeyboardEdits, !watch.isExpired(at: Date()) else {
+            clearEditWatch()
+            return
+        }
+
+        let proxy = textDocumentProxy
+        let context = (proxy.documentContextBeforeInput ?? "") + (proxy.documentContextAfterInput ?? "")
+        guard let edited = VocabularyLearner.editedSegment(inserted: watch.insertedText, context: context) else {
+            return // Unchanged so far, or a different field: keep watching until it expires.
+        }
+
+        clearEditWatch()
+        let candidates = VocabularyLearner.candidates(raw: watch.insertedText, corrected: edited)
+
+        if var record = (try? historyStore?.records())?.first(where: { $0.id == watch.dictationID }) {
+            record.editedText = edited
+            try? historyStore?.upsert(record)
+        }
+
+        guard let suggestions = try? vocabularyStore?.addSuggestions(candidates, source: .keyboardEdit), !suggestions.isEmpty else {
+            return
+        }
+        notice = suggestions.count == 1
+            ? "Learned 1 new word. Review it in the VoiceFlow app."
+            : "Learned \(suggestions.count) new words. Review them in the VoiceFlow app."
+        render()
+    }
+
+    private func clearEditWatch() {
+        editWatch = nil
+        try? editWatchStore?.set(nil)
     }
 
     private func showDictationError(_ error: Error) {
@@ -405,8 +511,8 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - Insert
 
     /// Inserts `text` with one `insertText` call (single undo step). Falls back to the
-    /// clipboard if the host silently drops the text. Returns whether the insert took.
-    private func insert(_ text: String) -> Bool {
+    /// clipboard if the host silently drops the text. Returns the inserted text, or `nil`.
+    private func insert(_ text: String) -> String? {
         let proxy = textDocumentProxy
         let beforeInput = proxy.documentContextBeforeInput
         let planned = InsertContextPlanner.plan(
@@ -414,7 +520,7 @@ final class KeyboardViewController: UIInputViewController {
             context: InsertContext(beforeInput: beforeInput, afterInput: proxy.documentContextAfterInput)
         )
 
-        guard !planned.text.isEmpty else { return false }
+        guard !planned.text.isEmpty else { return nil }
 
         proxy.insertText(planned.text)
 
@@ -424,12 +530,12 @@ final class KeyboardViewController: UIInputViewController {
             insertedText: planned.text
         ) {
         case .inserted, .unverifiable:
-            return true
+            return planned.text
         case .rejected:
             UIPasteboard.general.string = text
             latestReviewText = text
             shellState = .insertUnavailable(reason: .unknown)
-            return false
+            return nil
         }
     }
 

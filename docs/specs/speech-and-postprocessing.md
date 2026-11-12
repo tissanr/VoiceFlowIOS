@@ -1,8 +1,8 @@
 # Spec: Speech & Postprocessing
 
 > **Spec status:** Accepted (v3)
-> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; real-device validation and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark; staged postprocessing defined, not started)
-> **Last updated:** 2026-11-09
+> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; vocabulary `contextualStrings`, correction-pair replacement, and vocabulary learning implemented; custom language model, normalization, real-device validation, and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark)
+> **Last updated:** 2026-11-10
 > **Owners:** iOS
 
 Audio session, speech recognition strategy, and the postprocessing pipeline that turns raw recognition into shippable text.
@@ -95,9 +95,23 @@ The guardrail thresholds are tuning parameters; pick conservative defaults in MV
 Vocabulary is applied at two points:
 
 1. **At recognition time** — Apple Speech has no free-form prompt, but accepts `contextualStrings` on the recognition request and custom language models (`SFCustomLanguageModelData`, iOS 17+). Whisper takes an initial prompt with the glossary.
+   - **Implemented:** `SpeechEngine.contextualStrings`; callers pass `VocabularyCorrector.recognitionHints(from:)` — the `correction` of every active entry, deduplicated, most used first, capped at 100.
+   - **Pending:** custom language model. It must be prepared in the containing app (slow) and handed to the keyboard via the App Group; on-device recognition only.
 2. **After recognition** — deterministic correction pairs in Stage 1.
+   - **Implemented:** `VocabularyCorrector.apply` replaces active `heard` phrases (case-insensitive, whole words, flexible whitespace, longest first) and keeps sentence-start capitalization. Applied entry IDs bump `useCount`. Normalization (punctuation, whitespace) is still pending.
 
-Errors fixed at the source beat errors fixed by an LLM, which can only guess. New correction pairs are learned from user post-edits in the review screen, never silently in the background.
+Errors fixed at the source beat errors fixed by an LLM, which can only guess.
+
+#### Learning
+
+`VocabularyLearner` aligns the recognized text with the user's corrected text word by word (LCS) and keeps a replaced stretch as a candidate pair only if both sides have 1–3 words and it plausibly is a misrecognition: letters identical apart from spacing / case (`voice flow` → `VoiceFlow`), or normalized Levenshtein similarity ≥ 0.5 (`Cuba Netis` → `Kubernetes`, `Meier` → `Maier`). Rewrites (`gestern` → `heute`), pure insertions / deletions, punctuation-only changes, and sentence-start capitalization are ignored.
+
+Sources:
+
+- **History edit** in the containing app — the user corrects a dictation and saves.
+- **Keyboard post-edit** — see [keyboard-and-insert.md](keyboard-and-insert.md) → *Learning from post-edits*. Controlled by `VoiceFlowSettings.learnFromKeyboardEdits` (default on).
+
+Learning is automatic, activation is not: every candidate is stored as a **suggestion** that the user accepts or declines in the Words screen. Declined pairs are remembered and never re-suggested.
 
 ---
 

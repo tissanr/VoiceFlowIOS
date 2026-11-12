@@ -112,14 +112,15 @@ What is **already wired up**:
 - `InsertContextPlanner` / `InsertVerifier` insert rules.
 - `SpeechEngine` protocol, locale resolution, recognition policy, and the iOS-only `AppleSpeechEngine` (Phase 1.2).
 - Keyboard state shell plus the primary in-keyboard dictation flow (Phase 1.2).
+- Vocabulary (Phase 2.1 correction pairs, 2.2 learning + UI): `VocabularyStore`, `DictationHistoryStore`, `SettingsStore` (locked JSON / suite preferences in the App Group), `VocabularyLearner`, `VocabularyCorrector`, and the containing app's Dictate / History / Words / Settings tabs.
 
 What is **not yet** wired up:
 
 - Containing-app fallback recording flow (Phase 1.3).
 - `InsertGuard` Secure Field / Phone Pad detection (Phase 1.4).
-- `PostProcessor` rule pipeline (Phase 2.1).
+- `PostProcessor` normalization stage (Phase 2.1; correction pairs exist).
+- Custom language model (`SFCustomLanguageModelData`) for vocabulary.
 - Onboarding screens.
-- SwiftData history/vocabulary storage.
 
 Phase 0 items still open (0.6 manual device matrices, 0.7 human review) do not block Phase 1 by product decision; see [`ROADMAP.md`](ROADMAP.md).
 
