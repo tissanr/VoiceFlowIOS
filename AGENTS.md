@@ -32,6 +32,9 @@ docs/specs/
   privacy-and-app-review.md   - permissions, Open Access policy, telemetry, App Review
   build-and-ci.md             - local build, CI pipeline, code signing, fastlane
   testing.md                  - Phase 0 spikes, MVP acceptance, regression matrix
+  agent-tooling.md            - dev-only: agent guardrail checks, roles, workflows, hooks
+docs/agents/                  - agent-neutral roles and workflows (see agent-tooling.md)
+scripts/agent-checks/         - guardrail checks every agent runs before finishing
 ```
 
 ### How the docs relate
@@ -169,6 +172,17 @@ When making technical decisions, respect these iOS constraints:
 - Resolve merge conflicts before committing; do not commit `<<<<<<<` markers.
 - The App Group ID `group.me.tissanr.VoiceFlow.shared` must match in: project entitlements (both targets), `SharedStoreClient` source, and any docs that mention it. There is no other App Group ID in this project.
 - When you finish work that moves a phase or a spec forward, update the status in **both** the spec header and the `ROADMAP.md` tables.
+
+---
+
+## Agent tooling
+
+Rules, roles, and workflows for agents are defined once, agent-neutrally, in [`docs/specs/agent-tooling.md`](docs/specs/agent-tooling.md) and [`docs/agents/`](docs/agents/).
+
+- **Before finishing any task that changed files, run `scripts/agent-checks/run-all.sh`.** Fix every `ERROR`; report every `WARNING` to the human (PR description or final message). CI runs the same script.
+- For review, adopt the roles in [`docs/agents/roles/`](docs/agents/roles/): `spec-keeper` (docs and status consistency), `constraint-reviewer` (iOS product constraints), `privacy-guard` (App-Review-sensitive changes, flag only).
+- For recurring tasks, follow [`docs/agents/workflows/`](docs/agents/workflows/): `build-test`, `phase-advance`.
+- Agent-specific adapters (hooks, sub-agent or skill wrappers) only point at these files; never put rule content only into an adapter.
 
 ---
 
