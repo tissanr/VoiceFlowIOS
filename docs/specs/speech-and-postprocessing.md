@@ -1,8 +1,8 @@
 # Spec: Speech & Postprocessing
 
 > **Spec status:** Accepted (v3)
-> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; vocabulary `contextualStrings`, correction-pair replacement, and vocabulary learning implemented; custom language model, normalization, real-device validation, and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark)
-> **Last updated:** 2026-11-10
+> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; vocabulary `contextualStrings`, correction-pair replacement, vocabulary learning, and Stage 1 normalization (`PostProcessor` / `TextNormalizer`) implemented; custom language model, real-device validation, and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark)
+> **Last updated:** 2026-11-23
 > **Owners:** iOS
 
 Audio session, speech recognition strategy, and the postprocessing pipeline that turns raw recognition into shippable text.
@@ -80,6 +80,16 @@ Vocabulary passed into recognition (contextualStrings / custom LM / Whisper prom
 
 User-selectable in Settings; default `soft`.
 
+Stage 1 normalization (`TextNormalizer`, run by `PostProcessor` after correction pairs) maps the levels as follows. It only changes formatting, never words.
+
+| Level | Normalization |
+| --- | --- |
+| `minimal` | Collapse spaces / tabs, trim lines, keep at most one blank line; remove spaces before punctuation; collapse duplicated `,` `;` `:` and `..` (an ellipsis `...` is kept). |
+| `soft` | `minimal` + a space after `,` `;` `!` `?` when a letter follows (`.` and `:` are skipped for abbreviations, domains, times; digits for decimal commas); capitalize sentence starts **inside** the text, except after known abbreviations (`z.B.`, `bzw.`, `e.g.`, `vs.`, …), single-letter initials, and ellipses. |
+| `medium` | `soft` + a terminal period when the text ends with a letter or digit. |
+
+The first letter of the dictation is not changed: whether it starts a sentence depends on the text before the cursor, which `InsertContextPlanner` decides at insert time ([keyboard-and-insert.md](keyboard-and-insert.md)).
+
 ### Guardrails (must)
 
 - Maximum word-count deviation between raw and corrected.
@@ -98,7 +108,7 @@ Vocabulary is applied at two points:
    - **Implemented:** `SpeechEngine.contextualStrings`; callers pass `VocabularyCorrector.recognitionHints(from:)` — the `correction` of every active entry, deduplicated, most used first, capped at 100.
    - **Pending:** custom language model. It must be prepared in the containing app (slow) and handed to the keyboard via the App Group; on-device recognition only.
 2. **After recognition** — deterministic correction pairs in Stage 1.
-   - **Implemented:** `VocabularyCorrector.apply` replaces active `heard` phrases (case-insensitive, whole words, flexible whitespace, longest first) and keeps sentence-start capitalization. Applied entry IDs bump `useCount`. Normalization (punctuation, whitespace) is still pending.
+   - **Implemented:** `VocabularyCorrector.apply` replaces active `heard` phrases (case-insensitive, whole words, flexible whitespace, longest first) and keeps sentence-start capitalization. Applied entry IDs bump `useCount`. Normalization then runs on the corrected text (see *Correction levels*).
 
 Errors fixed at the source beat errors fixed by an LLM, which can only guess.
 

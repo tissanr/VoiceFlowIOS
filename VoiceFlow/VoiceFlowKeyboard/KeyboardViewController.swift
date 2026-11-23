@@ -428,7 +428,7 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
 
-        let corrected = VocabularyCorrector.apply(vocabulary, to: raw)
+        let corrected = PostProcessor.process(raw, vocabulary: vocabulary, level: settings.correctionLevel)
         try? vocabularyStore?.recordUse(of: corrected.appliedEntryIDs)
         let record = DictationRecord(
             sourceLocale: localeIdentifier ?? AppleSpeechEngine.resolvedLocale(for: settings).identifier,

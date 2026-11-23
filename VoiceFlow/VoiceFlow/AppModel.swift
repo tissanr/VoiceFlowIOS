@@ -77,9 +77,9 @@ final class AppModel {
 
     // MARK: - Dictation
 
-    /// Applies active correction pairs and returns the corrected text.
-    func process(_ rawText: String) -> VocabularyCorrector.Result {
-        let result = VocabularyCorrector.apply(vocabulary, to: rawText)
+    /// Runs the postprocessing pipeline (correction pairs + normalization) on recognized text.
+    func process(_ rawText: String) -> PostProcessor.Result {
+        let result = PostProcessor.process(rawText, vocabulary: vocabulary, level: settings.correctionLevel)
         perform { try vocabularyStore?.recordUse(of: result.appliedEntryIDs) }
         return result
     }
