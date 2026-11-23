@@ -1,6 +1,6 @@
 # VoiceFlow iOS — Roadmap
 
-> **Last updated:** 2026-11-12
+> **Last updated:** 2026-11-23
 > **Purpose:** Index of specifications, implementation status, and phase plan. The detailed product spec lives in [`docs/specs/`](docs/specs/) — start there for any deep dive.
 
 ---
@@ -27,7 +27,7 @@ Start here to see where the project is. The table is intentionally split by subp
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.4 Manual insert + unsupported-field fallback | 🟥 Not started | Covers `UITextDocumentProxy.insertText(...)`, Secure Fields, Phone Pads, disabled keyboards, and clipboard fallback. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.5 MVP onboarding, accessibility, and diagnostics baseline | 🟥 Not started | Covers activation flow, Open Access trade-off, VoiceOver labels, Dynamic Type baseline, and MetricKit surfacing. |
 | Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.0 ASR quality benchmark | 🟥 Not started | WER benchmark on a fixed German / English dictation corpus: `SFSpeechRecognizer`, iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit `large-v3-turbo`, Parakeet TDT v3. Verdict decides the engine the postprocessing pipeline is tuned against and whether Phase 5 starts. |
-| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.1 `PostProcessor` rule pipeline | 🟧 In progress | Stage 1: deterministic correction-pair replacement + normalization. Runs before any LLM stage. Correction-pair replacement (`VocabularyCorrector`) is implemented and applied in keyboard and app; normalization pending. |
+| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.1 `PostProcessor` rule pipeline | 🟩 Done | Stage 1: deterministic correction-pair replacement + normalization. Runs before any LLM stage. `PostProcessor` runs `VocabularyCorrector` then `TextNormalizer` (whitespace, punctuation spacing, inner sentence-start capitalization, terminal period at `medium`) per correction level in keyboard and app; unit-tested. Next: Stage 2 LLM adapter (2.3). |
 | Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.2 Vocabulary learning + management UI | 🟨 Awaiting review / blocked | Learn from raw vs. corrected text; show, edit, delete, and disable vocabulary entries. Implemented: vocabulary as `contextualStrings`, learning from History edits and keyboard post-edits into confirm-first suggestions, Words / History / Dictate / Settings UI in the containing app. Blocked on real-device validation and human privacy review of keyboard post-edit learning. Custom language model (`SFCustomLanguageModelData`) not started. |
 | Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.3 LLM adapter interface + guardrails | 🟥 Not started | Stage 2: on-device Apple Foundation Models adapter (iOS 26+, Apple Intelligence devices, runtime-gated) with a constrained task scope, guided generation, and segment-wise processing. Remote LLM remains gated by explicit privacy review. |
 | Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.4 Accessibility and localization hardening | 🟥 Not started | VoiceOver primary flow, German + English strings, Dynamic Type, contrast, and mixed-language handling. |
@@ -60,7 +60,7 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟧 In progress (shared model package wired; app and keyboard implementations pending) |
 | [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v3) | 🟧 In progress (`PendingInsert` shared-store handoff verified under contention; JSON file stores for history, vocabulary, settings implemented; device validation pending) |
-| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v3) | 🟧 In progress (`SpeechEngine` + `AppleSpeechEngine` implemented; vocabulary hints, correction pairs, and learning implemented; custom LM and normalization pending; device validation pending; engine choice reopened for 2.0 benchmark) |
+| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v3) | 🟧 In progress (`SpeechEngine` + `AppleSpeechEngine` implemented; vocabulary hints, correction pairs, learning, and Stage 1 normalization implemented; custom LM pending; device validation pending; engine choice reopened for 2.0 benchmark) |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟧 In progress (state shell, primary-flow insert with verification + clipboard fallback, vocabulary, and post-edit learning implemented; `InsertGuard` and host-app validation pending) |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
 | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v2) | 🟥 Not started (dictation locale defaults clarified) |
@@ -133,7 +133,7 @@ Drafts:
 
 ### Phase 2 — Postprocessing, Vocabulary, Accessibility hardening
 
-**Status:** 🟥 Not started
+**Status:** 🟧 In progress
 
 - **ASR quality benchmark (2.0)** — record a fixed corpus (≥10 typical dictations, German, English, mixed, domain terms) and measure WER per engine: `SFSpeechRecognizer` (with `contextualStrings`), iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit `large-v3-turbo` (with vocabulary prompt), Parakeet TDT v3 (FluidAudio / Core ML). Also record latency, peak memory, and model size. Postprocessing is tuned against the winning engine, not before.
 - **Fix errors at the source first:** pass vocabulary into recognition (`contextualStrings` / custom language model on Apple Speech, initial prompt on Whisper) before relying on postprocessing.
