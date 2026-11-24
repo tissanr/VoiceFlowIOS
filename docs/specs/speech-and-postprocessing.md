@@ -1,8 +1,8 @@
 # Spec: Speech & Postprocessing
 
 > **Spec status:** Accepted (v3)
-> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; vocabulary `contextualStrings`, correction-pair replacement, vocabulary learning, and Stage 1 normalization (`PostProcessor` / `TextNormalizer`) implemented; custom language model, real-device validation, and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark)
-> **Last updated:** 2026-11-23
+> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; vocabulary `contextualStrings`, correction-pair replacement, vocabulary learning, and Stage 1 normalization (`PostProcessor` / `TextNormalizer`) implemented; custom language model, real-device validation, and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark; experimental WhisperKit engine selectable in the containing app for that benchmark)
+> **Last updated:** 2026-11-24
 > **Owners:** iOS
 
 Audio session, speech recognition strategy, and the postprocessing pipeline that turns raw recognition into shippable text.
@@ -39,6 +39,16 @@ protocol SpeechEngine {
 | Apple `SpeechAnalyzer` / `SpeechTranscriber` (iOS 26) | System model, no bundle cost, works in extension memory budget | iOS 26 only; German quality unverified | Benchmark in Phase 2.0 |
 | WhisperKit `large-v3-turbo` (Core ML) | Expected stronger German accuracy (to be measured); vocabulary via initial prompt | Large model (size measured in 2.0), recent devices only, containing app only | Benchmark in Phase 2.0; Phase 5 if it wins |
 | Parakeet TDT v3 (FluidAudio / Core ML) | Very fast; 25 European languages incl. German | German quality unverified; containing app only | Benchmark in Phase 2.0 |
+
+### Experimental engine switch (containing app, Phase 2.0)
+
+To run the 2.0 benchmark on real dictations, the containing app's Dictate tab can switch engines via `VoiceFlowSettings.speechEngine` (`apple` default, `whisper`). The keyboard ignores this setting and always uses `AppleSpeechEngine`.
+
+- `WhisperSpeechEngine` lives in the separate `VoiceFlowWhisper` library of the `VoiceFlowShared` package, which only the `VoiceFlow` app target links. The extension-safe `VoiceFlowShared` library does not depend on WhisperKit.
+- `WhisperModelManager` (long-lived in `AppModel`) downloads the selected model (`VoiceFlowSettings.whisperModel`: `base`, `small`, `large-v3-turbo`; default `large-v3-turbo`) from `argmaxinc/whisperkit-coreml` on explicit user action in Settings, then keeps one loaded `WhisperKit` instance. An already downloaded model is loaded in the background when the Dictate tab appears; nothing is downloaded automatically. Switching back to Apple unloads it.
+- Recording goes to a 16 kHz mono WAV in the temp directory and is transcribed on Stop (no partial results), then deleted. Vocabulary terms are passed as Whisper decoder prompt tokens (max. 50 terms). Postprocessing is the same `PostProcessor` as for Apple Speech.
+- Each `DictationRecord` stores the producing `engine`, shown in History, so the same corpus can be compared per engine.
+- The model download is the only network access of this path; audio never leaves the device. Settings copy for this path is flagged for human review.
 
 ### Locale handling
 

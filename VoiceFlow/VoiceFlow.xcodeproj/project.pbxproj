@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		D4CD20022FA1000000736CEE /* VoiceFlowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20002FA1000000736CEE /* VoiceFlowShared */; };
 		D4CD20032FA1000000736CEE /* VoiceFlowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20012FA1000000736CEE /* VoiceFlowShared */; };
+		D4CD20062FA1000000736CEE /* VoiceFlowWhisper in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20052FA1000000736CEE /* VoiceFlowWhisper */; };
 		D4CD11692FA0FFE400736CEE /* VoiceFlowKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D4CD11622FA0FFE400736CEE /* VoiceFlowKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -106,6 +107,7 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				D4CD20022FA1000000736CEE /* VoiceFlowShared in Frameworks */,
+				D4CD20062FA1000000736CEE /* VoiceFlowWhisper in Frameworks */,
 			);
 		};
 		D4CD113E2FA0FF8E00736CEE /* Frameworks */ = {
@@ -172,6 +174,7 @@
 			name = VoiceFlow;
 			packageProductDependencies = (
 				D4CD20002FA1000000736CEE /* VoiceFlowShared */,
+				D4CD20052FA1000000736CEE /* VoiceFlowWhisper */,
 			);
 			productName = VoiceFlow;
 			productReference = D4CD11342FA0FF8D00736CEE /* VoiceFlow.app */;
@@ -747,6 +750,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D4CD20042FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowShared" */;
 			productName = VoiceFlowShared;
+		};
+		D4CD20052FA1000000736CEE /* VoiceFlowWhisper */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D4CD20042FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowShared" */;
+			productName = VoiceFlowWhisper;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

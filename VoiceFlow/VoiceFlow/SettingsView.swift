@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import VoiceFlowShared
+import VoiceFlowWhisper
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
@@ -15,6 +16,27 @@ struct SettingsView: View {
                         Text("English").tag(LocaleMode.english)
                     }
                     Toggle("Prefer on-device recognition", isOn: binding(\.preferOnDeviceSpeech))
+                }
+
+                Section {
+                    Picker("Engine", selection: binding(\.speechEngine)) {
+                        Text("Apple Speech").tag(SpeechEngineKind.apple)
+                        Text("Whisper (on-device)").tag(SpeechEngineKind.whisper)
+                    }
+
+                    if model.settings.speechEngine == .whisper {
+                        Picker("Model", selection: binding(\.whisperModel)) {
+                            ForEach(WhisperModelVariant.allCases, id: \.self) { variant in
+                                Text("\(variant.displayName) · ~\(variant.approximateSizeMB) MB").tag(variant)
+                            }
+                        }
+                        LabeledContent("Status", value: model.whisper.statusText)
+                        whisperActions
+                    }
+                } header: {
+                    Text("Recognition engine (in this app)")
+                } footer: {
+                    Text("Whisper runs entirely on this iPhone. The model is downloaded once from Hugging Face; your audio never leaves the device. Text appears after you tap Stop. The VoiceFlow keyboard always uses Apple Speech.")
                 }
 
                 Section {
@@ -44,6 +66,27 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+        }
+    }
+
+    @ViewBuilder
+    private var whisperActions: some View {
+        switch model.whisper.state {
+        case .notDownloaded, .failed:
+            Button("Download and load model") {
+                Task { await model.whisper.prepare() }
+            }
+        case .downloaded:
+            Button("Load model") {
+                Task { await model.whisper.prepare() }
+            }
+            Button("Delete download", role: .destructive) { model.whisper.deleteDownload() }
+        case .downloading(let progress):
+            ProgressView(value: progress)
+        case .loading:
+            ProgressView()
+        case .ready:
+            Button("Delete download", role: .destructive) { model.whisper.deleteDownload() }
         }
     }
 

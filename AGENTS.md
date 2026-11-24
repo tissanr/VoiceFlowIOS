@@ -114,6 +114,8 @@ What is **already wired up**:
 - Keyboard state shell plus the primary in-keyboard dictation flow (Phase 1.2).
 - Vocabulary (Phase 2.1 correction pairs, 2.2 learning + UI): `VocabularyStore`, `DictationHistoryStore`, `SettingsStore` (locked JSON / suite preferences in the App Group), `VocabularyLearner`, `VocabularyCorrector`, `PostProcessor` Stage 1 (correction pairs + `TextNormalizer`, Phase 2.1), and the containing app's Dictate / History / Words / Settings tabs.
 
+- Experimental engine switch for the Phase 2.0 benchmark: the containing app's Dictate tab can use an on-device WhisperKit engine (`VoiceFlowWhisper` library, app target only; the keyboard stays on Apple Speech).
+
 What is **not yet** wired up:
 
 - Containing-app fallback recording flow (Phase 1.3).

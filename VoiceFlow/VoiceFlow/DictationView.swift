@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import VoiceFlowShared
+import VoiceFlowWhisper
 
 /// In-app dictation with the user's vocabulary. Also the place to try new words
 /// without setting up the keyboard.
@@ -37,6 +38,15 @@ struct DictationView: View {
             }
             .padding()
             .navigationTitle("Dictate")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Text(model.settings.speechEngine == .whisper ? "Whisper" : "Apple")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Recognition engine: \(model.settings.speechEngine == .whisper ? "Whisper" : "Apple Speech")")
+                }
+            }
+            .task { await model.warmUpSpeechEngine() }
         }
     }
 
@@ -44,8 +54,14 @@ struct DictationView: View {
         switch controller.phase {
         case .idle:
             return controller.errorText ?? "Tap the microphone and speak. Words from your list are recognized better."
+        case .preparingModel:
+            return model.whisper.statusText
         case .recording:
-            return controller.partialText.isEmpty ? "Listening…" : controller.partialText
+            if controller.partialText.isEmpty {
+                // Whisper transcribes after Stop, so there is no live text to show.
+                return model.settings.speechEngine == .whisper ? "Listening… (text appears after Stop)" : "Listening…"
+            }
+            return controller.partialText
         case .transcribing:
             return controller.partialText.isEmpty ? "Transcribing…" : controller.partialText
         case .finished(let result):
@@ -80,6 +96,18 @@ struct DictationView: View {
             }
             .controlSize(.large)
 
+        case .preparingModel:
+            VStack(spacing: 12) {
+                if case .downloading(let progress) = model.whisper.state {
+                    ProgressView(value: progress)
+                } else {
+                    ProgressView()
+                }
+                Button("Cancel", role: .cancel) { controller.cancel() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+            }
+
         case .transcribing:
             ProgressView()
 
@@ -111,6 +139,8 @@ final class DictationController: SpeechEngineDelegate {
 
     enum Phase: Equatable {
         case idle
+        /// Downloading or loading the Whisper model before recording can start.
+        case preparingModel
         case recording
         case transcribing
         case finished(Result)
@@ -121,26 +151,51 @@ final class DictationController: SpeechEngineDelegate {
     private(set) var inputLevel: Float = 0
     private(set) var errorText: String?
 
-    @ObservationIgnored private var engine: AppleSpeechEngine?
+    @ObservationIgnored private var engine: SpeechEngine?
+    @ObservationIgnored private var engineKind: SpeechEngineKind = .apple
     @ObservationIgnored private weak var model: AppModel?
 
     func start(model: AppModel) {
         errorText = nil
         partialText = ""
         self.model = model
-        let engine = AppleSpeechEngine(settings: model.settings)
-        engine.delegate = self
-        engine.contextualStrings = model.recognitionHints
-        self.engine = engine
-        phase = .recording
+        let settings = model.settings
+        engineKind = settings.speechEngine
 
-        let locale = AppleSpeechEngine.resolvedLocale(for: model.settings)
         Task {
             do {
-                try await engine.start(locale: locale)
+                let engine = try await makeEngine(for: settings, model: model)
+                engine.delegate = self
+                engine.contextualStrings = model.recognitionHints
+                self.engine = engine
+                phase = .recording
+                try await engine.start(locale: AppleSpeechEngine.resolvedLocale(for: settings))
+            } catch SpeechEngineError.cancelled {
+                reset()
             } catch {
                 fail(error)
             }
+        }
+    }
+
+    private func makeEngine(for settings: VoiceFlowSettings, model: AppModel) async throws -> SpeechEngine {
+        switch settings.speechEngine {
+        case .apple:
+            return AppleSpeechEngine(settings: settings)
+        case .whisper:
+            if !model.whisper.isReady {
+                phase = .preparingModel
+                await model.whisper.prepare()
+                // The user tapped Cancel while the model was loading.
+                guard phase == .preparingModel else { throw SpeechEngineError.cancelled }
+            }
+            guard let kit = model.whisper.whisperKit else {
+                if case .failed(let message) = model.whisper.state {
+                    throw SpeechEngineError.recognizerUnavailable("Whisper (\(message))")
+                }
+                throw SpeechEngineError.cancelled
+            }
+            return WhisperSpeechEngine(whisperKit: kit, settings: settings)
         }
     }
 
@@ -187,7 +242,8 @@ final class DictationController: SpeechEngineDelegate {
             correctionLevel: model.settings.correctionLevel,
             durationMs: durationMs,
             wordCount: processed.text.split(whereSeparator: \.isWhitespace).count,
-            state: .readyForReview
+            state: .readyForReview,
+            engine: engineKind
         ))
         engine = nil
         phase = .finished(Result(text: processed.text, appliedCorrections: processed.appliedEntryIDs))
