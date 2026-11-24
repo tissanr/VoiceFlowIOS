@@ -2,7 +2,7 @@
 
 > **Spec status:** Accepted (v1)
 > **Implementation status:** Not started (budgets unverified; old-device Phase 0 recording pass skipped)
-> **Last updated:** 2026-05-19
+> **Last updated:** 2026-11-24
 > **Owners:** iOS
 
 Numeric budgets. These are MVP exit criteria, not aspirational.
@@ -19,7 +19,8 @@ iOS terminates Keyboard Extensions that exceed roughly **48 MB** resident memory
 | `PendingInsert` cache | < 8 KB | Single record. |
 | Vocabulary loaded in-extension | ≤ 200 entries OR < 64 KB | Lazy-loaded; rest stays in containing app. |
 | History loaded in-extension | last 5 entries only | Full history lives only in the app. |
-| Speech recognition (primary flow) | measured in Phase 0 spike | If the spike shows we cannot stay under budget with live recognition, primary flow is restricted to capable device classes; affected users get the fallback flow. |
+| Speech recognition (primary flow) | measured in Phase 0 spike | If the spike shows we cannot stay under budget with live recognition, primary flow is restricted to capable device classes; affected users get the fallback flow. Measure both keyboard engines: `SFSpeechRecognizer` and iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`. If `SpeechAnalyzer` exceeds the budget, the keyboard host must resolve to the classic engine. |
+| Bundled ASR models (Parakeet, Whisper) | 0 — never loaded | The keyboard target does not link `VoiceFlowParakeet` or `VoiceFlowWhisper`; those preferences resolve to an Apple engine in the keyboard. |
 
 The Phase 0 in-keyboard recording harness exists, but the old-device / borrowed-device hardware pass was skipped by product decision. The MVP must still meet these budgets before release; until measurements exist, primary in-keyboard recording remains an explicit risk and the containing-app fallback flow must stay first-class.
 
@@ -29,7 +30,8 @@ The Phase 0 in-keyboard recording harness exists, but the old-device / borrowed-
 
 | Item | Budget |
 | --- | --- |
-| Containing app peak memory during recording | < 120 MB |
+| Containing app peak memory during recording | < 120 MB (Apple engines) |
+| Containing app peak memory during Parakeet / Whisper transcription | measured in Phase 2.0 per model; FluidAudio reports ~66 MB for the Parakeet TDT encoder alone; a loaded Whisper large-v3-turbo holds hundreds of MB, so the app unloads Whisper when another engine is chosen |
 | Containing app peak memory at history-list render (200 entries) | < 80 MB |
 
 ---

@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
+import VoiceFlowParakeet
 import VoiceFlowShared
+import VoiceFlowWhisper
 
 /// In-app dictation with the user's vocabulary. Also the place to try new words
 /// without setting up the keyboard.
@@ -37,6 +39,15 @@ struct DictationView: View {
             }
             .padding()
             .navigationTitle("Dictate")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Text(model.settings.speechEngine.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Recognition engine: \(model.settings.speechEngine.displayName)")
+                }
+            }
+            .task { await model.warmUpSpeechEngine() }
         }
     }
 
@@ -44,8 +55,14 @@ struct DictationView: View {
         switch controller.phase {
         case .idle:
             return controller.errorText ?? "Tap the microphone and speak. Words from your list are recognized better."
+        case .preparingModel:
+            return model.whisper.statusText
         case .recording:
-            return controller.partialText.isEmpty ? "Listening…" : controller.partialText
+            if controller.partialText.isEmpty {
+                // Parakeet and Whisper transcribe after Stop, so there is no live text to show.
+                return model.settings.speechEngine.isContainingAppOnly ? "Listening… (text appears after Stop)" : "Listening…"
+            }
+            return controller.partialText
         case .transcribing:
             return controller.partialText.isEmpty ? "Transcribing…" : controller.partialText
         case .finished(let result):
@@ -80,6 +97,18 @@ struct DictationView: View {
             }
             .controlSize(.large)
 
+        case .preparingModel:
+            VStack(spacing: 12) {
+                if case .downloading(let progress) = model.whisper.state {
+                    ProgressView(value: progress)
+                } else {
+                    ProgressView()
+                }
+                Button("Cancel", role: .cancel) { controller.cancel() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+            }
+
         case .transcribing:
             ProgressView()
 
@@ -111,6 +140,8 @@ final class DictationController: SpeechEngineDelegate {
 
     enum Phase: Equatable {
         case idle
+        /// Downloading or loading the Whisper model before recording can start.
+        case preparingModel
         case recording
         case transcribing
         case finished(Result)
@@ -121,31 +152,90 @@ final class DictationController: SpeechEngineDelegate {
     private(set) var inputLevel: Float = 0
     private(set) var errorText: String?
 
-    @ObservationIgnored private var engine: AppleSpeechEngine?
+    @ObservationIgnored private var engine: SpeechEngine?
+    /// Engine that actually runs (after fallback), stored with the dictation.
+    @ObservationIgnored private var engineKind: SpeechEngineKind = .appleClassic
+    /// Incremented per start so a slow engine setup cannot revive a cancelled dictation.
+    @ObservationIgnored private var startID = 0
     @ObservationIgnored private weak var model: AppModel?
 
     func start(model: AppModel) {
         errorText = nil
         partialText = ""
         self.model = model
-        let engine = AppleSpeechEngine(settings: model.settings)
-        engine.delegate = self
-        engine.contextualStrings = model.recognitionHints
-        self.engine = engine
-        phase = .recording
+        startID += 1
+        let currentStartID = startID
 
-        let locale = AppleSpeechEngine.resolvedLocale(for: model.settings)
+        let settings = model.settings
+        let locale = AppleSpeechEngine.resolvedLocale(for: settings)
+        let hints = model.recognitionHints
+        phase = settings.speechEngine == .whisper && !model.whisper.isReady ? .preparingModel : .recording
+
         Task {
             do {
+                let (engine, resolved) = try await SpeechEngineFactory.makeEngine(
+                    settings: settings,
+                    locale: locale,
+                    host: .containingApp,
+                    appEngine: { [weak self] kind in
+                        try await self?.makeAppEngine(kind, settings: settings, model: model, startID: currentStartID)
+                    }
+                )
+                guard currentStartID == startID else {
+                    engine.cancel()
+                    return
+                }
+                engineKind = resolved.kind
+                engine.delegate = self
+                engine.contextualStrings = hints
+                self.engine = engine
+                phase = .recording
                 try await engine.start(locale: locale)
+            } catch SpeechEngineError.cancelled {
+                guard currentStartID == startID else { return }
+                reset()
             } catch {
+                guard currentStartID == startID else { return }
                 fail(error)
             }
         }
     }
 
+    /// App-only engines. Parakeet falls back to Apple when its models are missing; Whisper downloads
+    /// and loads the chosen model on first use (the user picked it explicitly) and reports failures.
+    private func makeAppEngine(
+        _ kind: SpeechEngineKind,
+        settings: VoiceFlowSettings,
+        model: AppModel,
+        startID currentStartID: Int
+    ) async throws -> SpeechEngine? {
+        switch kind {
+        case .parakeet:
+            return ParakeetSpeechEngine.makeIfReady()
+        case .whisper:
+            if !model.whisper.isReady {
+                await model.whisper.prepare()
+                // The user tapped Cancel while the model was loading.
+                guard currentStartID == startID else { throw SpeechEngineError.cancelled }
+            }
+            guard let kit = model.whisper.whisperKit else {
+                if case .failed(let message) = model.whisper.state {
+                    throw SpeechEngineError.recognizerUnavailable("Whisper (\(message))")
+                }
+                throw SpeechEngineError.cancelled
+            }
+            return WhisperSpeechEngine(whisperKit: kit, settings: settings)
+        default:
+            return nil
+        }
+    }
+
     func stop(model: AppModel) {
-        guard let engine else { return }
+        guard let engine else {
+            // Stopped before the engine finished setting up: nothing was recorded.
+            cancel()
+            return
+        }
         phase = .transcribing
         Task {
             do {
@@ -165,6 +255,7 @@ final class DictationController: SpeechEngineDelegate {
     }
 
     func reset() {
+        startID += 1
         engine = nil
         partialText = ""
         inputLevel = 0
@@ -187,7 +278,8 @@ final class DictationController: SpeechEngineDelegate {
             correctionLevel: model.settings.correctionLevel,
             durationMs: durationMs,
             wordCount: processed.text.split(whereSeparator: \.isWhitespace).count,
-            state: .readyForReview
+            state: .readyForReview,
+            engine: engineKind
         ))
         engine = nil
         phase = .finished(Result(text: processed.text, appliedCorrections: processed.appliedEntryIDs))

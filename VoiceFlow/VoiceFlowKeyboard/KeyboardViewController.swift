@@ -13,7 +13,9 @@ final class KeyboardViewController: UIInputViewController {
 
     private var settings = VoiceFlowSettings.defaults
     /// Created per dictation so it always uses the current settings and vocabulary.
-    private var speechEngine: AppleSpeechEngine?
+    private var speechEngine: SpeechEngine?
+    /// Incremented per dictation so a slow engine setup cannot revive a cancelled one.
+    private var dictationID = 0
     private var sharedStoreClient: SharedStoreClient?
     private var vocabularyStore: VocabularyStore?
     private var historyStore: DictationHistoryStore?
@@ -373,14 +375,21 @@ final class KeyboardViewController: UIInputViewController {
         shellState = .recording(elapsedSeconds: 0)
 
         vocabulary = (try? vocabularyStore?.entries()) ?? []
-        let engine = AppleSpeechEngine(settings: settings)
-        engine.delegate = self
-        engine.contextualStrings = VocabularyCorrector.recognitionHints(from: vocabulary)
-        speechEngine = engine
+        speechEngine = nil
+        dictationID += 1
+        let currentDictationID = dictationID
 
+        let settings = self.settings
         let locale = AppleSpeechEngine.resolvedLocale(for: settings)
+        let hints = VocabularyCorrector.recognitionHints(from: vocabulary)
         Task { [weak self] in
-            guard let self else { return }
+            // Keyboard host: never Parakeet; SpeechAnalyzer only when its assets are installed.
+            // No app-engine provider here, so this cannot throw; `try?` keeps the keyboard on the safe path.
+            guard let (engine, _) = try? await SpeechEngineFactory.makeEngine(settings: settings, locale: locale, host: .keyboardExtension) else { return }
+            guard let self, currentDictationID == self.dictationID, case .recording = self.shellState else { return }
+            engine.delegate = self
+            engine.contextualStrings = hints
+            self.speechEngine = engine
             do {
                 try await engine.start(locale: locale)
                 // The user may have cancelled while permissions were being requested.
@@ -401,7 +410,11 @@ final class KeyboardViewController: UIInputViewController {
         Task { [weak self] in
             guard let self else { return }
             do {
-                guard let engine = self.speechEngine else { return }
+                guard let engine = self.speechEngine else {
+                    // Stopped before the engine finished setting up: nothing was recorded.
+                    self.showDictationError(SpeechEngineError.recognitionFailed("No speech recognized"))
+                    return
+                }
                 let result = try await engine.stop()
                 guard case .transcribing = self.shellState else { return }
                 self.showReview(

@@ -126,5 +126,21 @@ final class VocabularyStoreTests: XCTestCase {
         let settings = try JSONDecoder().decode(VoiceFlowSettings.self, from: data)
         XCTAssertEqual(settings.localeMode, .german)
         XCTAssertTrue(settings.learnFromKeyboardEdits)
+        XCTAssertEqual(settings.speechEngine, .automatic)
+        XCTAssertEqual(settings.whisperModel, .largeV3Turbo)
+    }
+
+    func testSettingsRoundTripSpeechEngine() throws {
+        let original = VoiceFlowSettings(speechEngine: .whisper, whisperModel: .small)
+        let decoded = try JSONDecoder().decode(VoiceFlowSettings.self, from: JSONEncoder().encode(original))
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testSettingsUnknownEngineFallsBackToDefault() throws {
+        let data = Data(#"{"localeMode":"english","speechEngine":"someFutureEngine","whisperModel":"tiny"}"#.utf8)
+        let settings = try JSONDecoder().decode(VoiceFlowSettings.self, from: data)
+        XCTAssertEqual(settings.localeMode, .english)
+        XCTAssertEqual(settings.speechEngine, .automatic)
+        XCTAssertEqual(settings.whisperModel, .largeV3Turbo)
     }
 }

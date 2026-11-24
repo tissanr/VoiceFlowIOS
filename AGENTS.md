@@ -111,6 +111,7 @@ What is **already wired up**:
 - `PendingInsert` `SharedStoreClient` using the generation-counter concurrency protocol. It is the only allowed App Group access path.
 - `InsertContextPlanner` / `InsertVerifier` insert rules.
 - `SpeechEngine` protocol, locale resolution, recognition policy, and the iOS-only `AppleSpeechEngine` (Phase 1.2).
+- Selectable speech engines: `SpeechEngineSelection` / `SpeechEngineFactory`, shared `MicrophoneCapture`, iOS 26 `SpeechAnalyzerEngine` (keyboard + app), and the app-only [`VoiceFlow/VoiceFlowParakeet`](VoiceFlow/VoiceFlowParakeet) (`ParakeetSpeechEngine`, `ParakeetModelStore`) and [`VoiceFlow/VoiceFlowWhisper`](VoiceFlow/VoiceFlowWhisper) (`WhisperSpeechEngine`, `WhisperModelManager`, models base / small / large-v3-turbo) packages. `DictationRecord.engine` stores the engine that ran.
 - Keyboard state shell plus the primary in-keyboard dictation flow (Phase 1.2).
 - Vocabulary (Phase 2.1 correction pairs, 2.2 learning + UI): `VocabularyStore`, `DictationHistoryStore`, `SettingsStore` (locked JSON / suite preferences in the App Group), `VocabularyLearner`, `VocabularyCorrector`, `PostProcessor` Stage 1 (correction pairs + `TextNormalizer`, Phase 2.1), and the containing app's Dictate / History / Words / Settings tabs.
 
@@ -144,7 +145,7 @@ When making technical decisions, respect these iOS constraints:
 - Swift + SwiftUI for the containing app.
 - UIKit + `UIInputViewController` for the Keyboard Extension (SwiftUI-hosted views are acceptable where they remain stable inside extensions).
 - Extension-safe shared code lives in its own framework / Swift package; app-only code stays in `VoiceFlow`.
-- Apple Speech (`SFSpeechRecognizer`) is the MVP engine. The final engine choice is decided by the Phase 2.0 ASR quality benchmark (WER on a fixed German / English corpus: Apple Speech, iOS 26 `SpeechAnalyzer`, WhisperKit, Parakeet). Non-Apple engines (WhisperKit / Parakeet via Core ML) are **Phase 5** items, gated by that benchmark, and run in the containing app only — never in the Keyboard Extension. See [`docs/specs/speech-and-postprocessing.md`](docs/specs/speech-and-postprocessing.md).
+- Speech engines are selectable behind `SpeechEngine`: classic Apple Speech (`SFSpeechRecognizer`, iOS 17+), iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, Parakeet (FluidAudio / Core ML), and Whisper (WhisperKit / Core ML). The default is `automatic` (SpeechAnalyzer when its assets are installed, else classic); the Phase 2.0 WER benchmark confirms the default. Non-Apple engines run in the containing app only — never in the Keyboard Extension — and live in the separate `VoiceFlowParakeet` and `VoiceFlowWhisper` packages that the keyboard target must not link. Their models are downloaded only on explicit user action. See [`docs/specs/speech-and-postprocessing.md`](docs/specs/speech-and-postprocessing.md).
 - Manual Insert in MVP. Auto-insert is post-MVP.
 - Use Apple's MetricKit for crash / diagnostic reporting unless Phase 0 explicitly approves a third-party choice.
 - Add tests around state models, shared store behavior, postprocessing, and insert-context rules as code lands.

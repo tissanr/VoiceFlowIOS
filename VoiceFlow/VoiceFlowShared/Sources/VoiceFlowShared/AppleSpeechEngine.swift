@@ -12,11 +12,10 @@ public final class AppleSpeechEngine: SpeechEngine {
 
     private let settings: VoiceFlowSettings
     private let finalResultTimeout: Duration
-    private let audioEngine = AVAudioEngine()
+    private let capture = MicrophoneCapture()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var speechRecognizer: SFSpeechRecognizer?
-    private var inputTapInstalled = false
     private var isStopping = false
     private var latestText = ""
     private var localeIdentifier = ""
@@ -26,16 +25,17 @@ public final class AppleSpeechEngine: SpeechEngine {
     private var finalResultTimeoutTask: Task<Void, Never>?
     /// Incremented per recording so late callbacks from a previous recognition task are ignored.
     private var sessionID = 0
-    private var observers: [NSObjectProtocol] = []
 
     public init(settings: VoiceFlowSettings = .defaults, finalResultTimeout: Duration = .seconds(2)) {
         self.settings = settings
         self.finalResultTimeout = finalResultTimeout
-        installObservers()
-    }
-
-    deinit {
-        observers.forEach(NotificationCenter.default.removeObserver)
+        capture.onInputLevel = { [weak self] level in
+            guard let self, !self.isStopping else { return }
+            self.delegate?.speechEngine(self, didUpdateInputLevel: level)
+        }
+        capture.onUnexpectedStop = { [weak self] error in
+            self?.endUnexpectedly(error)
+        }
     }
 
     /// True from `start` until the final result is delivered or the recording is torn down.
@@ -68,24 +68,7 @@ public final class AppleSpeechEngine: SpeechEngine {
     }
 
     public func requestPermissions() async throws {
-        guard await AVAudioApplication.requestRecordPermission() else {
-            throw SpeechEngineError.microphonePermissionDenied
-        }
-
-        let speechStatus: SFSpeechRecognizerAuthorizationStatus
-        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
-            speechStatus = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { status in
-                    continuation.resume(returning: status)
-                }
-            }
-        } else {
-            speechStatus = SFSpeechRecognizer.authorizationStatus()
-        }
-
-        guard speechStatus == .authorized else {
-            throw SpeechEngineError.speechPermissionDenied
-        }
+        try await SpeechPermissions.request(speechRecognition: true)
     }
 
     public func start(locale: Locale) async throws {
@@ -126,7 +109,7 @@ public final class AppleSpeechEngine: SpeechEngine {
         isStopping = false
 
         do {
-            try startAudio(request: request, sessionID: currentSessionID)
+            try capture.start(bufferHandler: Self.makeBufferHandler(request: request))
         } catch {
             teardown()
             throw SpeechEngineError.audioInputUnavailable
@@ -145,7 +128,7 @@ public final class AppleSpeechEngine: SpeechEngine {
         }
 
         isStopping = true
-        stopAudio()
+        capture.stop()
         recognitionRequest?.endAudio()
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -168,69 +151,11 @@ public final class AppleSpeechEngine: SpeechEngine {
 
     // MARK: - Audio
 
-    private func startAudio(request: SFSpeechAudioBufferRecognitionRequest, sessionID: Int) throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: [.duckOthers, .allowBluetoothHFP])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-        let inputNode = audioEngine.inputNode
-        guard inputNode.outputFormat(forBus: 0).sampleRate > 0 else {
-            throw SpeechEngineError.audioInputUnavailable
-        }
-
-        let onLevel: @Sendable (Float) -> Void = { [weak self] level in
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self, self.sessionID == sessionID, !self.isStopping else { return }
-                    self.delegate?.speechEngine(self, didUpdateInputLevel: level)
-                }
-            }
-        }
-
-        inputNode.installTap(onBus: 0, bufferSize: 1_024, format: nil, block: Self.makeTapBlock(request: request, onLevel: onLevel))
-        inputTapInstalled = true
-
-        audioEngine.prepare()
-        try audioEngine.start()
-    }
-
-    private func stopAudio() {
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
-
-        if inputTapInstalled {
-            audioEngine.inputNode.removeTap(onBus: 0)
-            inputTapInstalled = false
-        }
-    }
-
     /// Built outside the main actor: the tap runs on the realtime audio thread.
-    private nonisolated static func makeTapBlock(
-        request: SFSpeechAudioBufferRecognitionRequest,
-        onLevel: @escaping @Sendable (Float) -> Void
-    ) -> AVAudioNodeTapBlock {
-        { buffer, _ in
-            request.append(buffer)
-            onLevel(normalizedLevel(of: buffer))
-        }
-    }
-
-    private nonisolated static func normalizedLevel(of buffer: AVAudioPCMBuffer) -> Float {
-        guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else {
-            return 0
-        }
-
-        let frameCount = Int(buffer.frameLength)
-        var sumOfSquares: Float = 0
-        for index in 0..<frameCount {
-            sumOfSquares += samples[index] * samples[index]
-        }
-
-        let rms = (sumOfSquares / Float(frameCount)).squareRoot()
-        let decibels = 20 * log10(max(rms, 0.000_01))
-        // Map roughly -50 dB (quiet room) ... 0 dB (clipping) onto 0 ... 1.
-        return min(1, max(0, (decibels + 50) / 50))
+    private nonisolated static func makeBufferHandler(
+        request: SFSpeechAudioBufferRecognitionRequest
+    ) -> MicrophoneCapture.BufferHandler {
+        { buffer in request.append(buffer) }
     }
 
     // MARK: - Recognition
@@ -310,48 +235,18 @@ public final class AppleSpeechEngine: SpeechEngine {
         finalResultTimeoutTask = nil
         recognitionTask?.cancel()
         recognitionTask = nil
-        stopAudio()
+        capture.stop()
         recognitionRequest = nil
         speechRecognizer = nil
         isStopping = false
         startedAt = nil
-        // The keyboard must release the session before dismissal; let paused audio resume.
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        capture.deactivateSession()
     }
 
     private func elapsedMilliseconds() -> Int {
         guard let startedAt else { return 0 }
         let duration = startedAt.duration(to: .now)
         return Int(duration.components.seconds * 1_000 + duration.components.attoseconds / 1_000_000_000_000_000)
-    }
-
-    // MARK: - Interruptions
-
-    private func installObservers() {
-        let center = NotificationCenter.default
-        let session = AVAudioSession.sharedInstance()
-
-        observers = [
-            center.addObserver(forName: AVAudioSession.interruptionNotification, object: session, queue: .main) { [weak self] notification in
-                let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-                MainActor.assumeIsolated {
-                    guard rawType.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .began else { return }
-                    self?.endUnexpectedly(.interrupted)
-                }
-            },
-            center.addObserver(forName: AVAudioSession.mediaServicesWereLostNotification, object: session, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.endUnexpectedly(.audioInputUnavailable)
-                }
-            },
-            // Route changes such as unplugging a headset stop the engine without an interruption.
-            center.addObserver(forName: .AVAudioEngineConfigurationChange, object: audioEngine, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self, !self.isStopping, !self.audioEngine.isRunning else { return }
-                    self.endUnexpectedly(.interrupted)
-                }
-            }
-        ]
     }
 }
 #endif

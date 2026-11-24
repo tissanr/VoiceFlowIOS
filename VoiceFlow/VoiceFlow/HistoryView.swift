@@ -78,6 +78,7 @@ private struct HistoryDetailView: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                 LabeledContent("Language", value: record.sourceLocale)
+                LabeledContent("Engine", value: (record.engine ?? .appleClassic).displayName)
                 LabeledContent("Duration", value: Duration.milliseconds(record.durationMs).formatted(.units(allowed: [.seconds])))
             }
 

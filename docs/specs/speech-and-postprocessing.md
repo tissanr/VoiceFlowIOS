@@ -1,8 +1,8 @@
 # Spec: Speech & Postprocessing
 
-> **Spec status:** Accepted (v3)
-> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, and iOS `AppleSpeechEngine` implemented in `VoiceFlowShared`; vocabulary `contextualStrings`, correction-pair replacement, vocabulary learning, and Stage 1 normalization (`PostProcessor` / `TextNormalizer`) implemented; custom language model, real-device validation, and partial-transcript persistence on interruption pending; engine choice reopened for the Phase 2.0 WER benchmark)
-> **Last updated:** 2026-11-23
+> **Spec status:** Accepted (v4 — selectable engines: classic Apple Speech, iOS 26 `SpeechAnalyzer`, and Parakeet / Whisper in the containing app)
+> **Implementation status:** In progress (`SpeechEngine` protocol, `SpeechLocaleResolver`, `SpeechRecognitionPolicy`, `MicrophoneCapture`, `SpeechEngineSelection` / `SpeechEngineFactory`, `AppleSpeechEngine`, and iOS 26 `SpeechAnalyzerEngine` implemented in `VoiceFlowShared`; `ParakeetSpeechEngine` + `ParakeetModelStore` in the app-only `VoiceFlowParakeet` package; `WhisperSpeechEngine` + `WhisperModelManager` in the app-only `VoiceFlowWhisper` package; vocabulary `contextualStrings`, correction-pair replacement, vocabulary learning, and Stage 1 normalization (`PostProcessor` / `TextNormalizer`) implemented; custom language model, real-device validation of all engines, and partial-transcript persistence on interruption pending; default engine to be confirmed by the Phase 2.0 WER benchmark)
+> **Last updated:** 2026-11-24
 > **Owners:** iOS
 
 Audio session, speech recognition strategy, and the postprocessing pipeline that turns raw recognition into shippable text.
@@ -22,23 +22,34 @@ Audio session, speech recognition strategy, and the postprocessing pipeline that
 
 ## Speech engine
 
-VoiceFlow uses Apple's Speech framework (`SFSpeechRecognizer`) for the MVP. The final engine choice is made by the Phase 2.0 ASR quality benchmark, which measures WER on a fixed German / English / mixed corpus across Apple Speech, iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit, and Parakeet. Non-Apple engines are integrated in Phase 5 only if the benchmark shows a clear advantage, and run in the containing app only. The Phase 0 Speech verdict is documented in [../spikes/apple-speech-locale-availability.md](../spikes/apple-speech-locale-availability.md).
+VoiceFlow ships four engines behind the `SpeechEngine` protocol. The user picks one in Settings (`VoiceFlowSettings.speechEngine`, default `automatic`); `SpeechEngineSelection` resolves the preference per host and never fails — anything not ready falls back to the classic Apple engine. The Phase 2.0 WER benchmark (German / English / mixed corpus) runs these engines side by side in the containing app and confirms or changes the default. The Phase 0 Speech verdict is documented in [../spikes/apple-speech-locale-availability.md](../spikes/apple-speech-locale-availability.md).
 
 ```swift
 protocol SpeechEngine {
+    var contextualStrings: [String] { get set }
     func requestPermissions() async throws
     func start(locale: Locale) async throws
     func stop() async throws -> SpeechResult
+    func cancel()
 }
 ```
 
-| Option | Benefit | Drawback | Decision |
+| Engine (`SpeechEngineKind`) | Implementation | Hosts | Notes |
 | --- | --- | --- | --- |
-| Apple Speech Framework | Fast MVP, native API, low ML complexity | Own recording required, system behavior not fully controllable | **MVP default** |
-| Apple Speech On-Device | Local without a custom model | Availability depends on language / device / iOS version | Validate in Phase 0; check `supportsOnDeviceRecognition` per locale |
-| Apple `SpeechAnalyzer` / `SpeechTranscriber` (iOS 26) | System model, no bundle cost, works in extension memory budget | iOS 26 only; German quality unverified | Benchmark in Phase 2.0 |
-| WhisperKit `large-v3-turbo` (Core ML) | Expected stronger German accuracy (to be measured); vocabulary via initial prompt | Large model (size measured in 2.0), recent devices only, containing app only | Benchmark in Phase 2.0; Phase 5 if it wins |
-| Parakeet TDT v3 (FluidAudio / Core ML) | Very fast; 25 European languages incl. German | German quality unverified; containing app only | Benchmark in Phase 2.0 |
+| `appleClassic` | `AppleSpeechEngine` — `SFSpeechRecognizer`, iOS 17+ | Keyboard + app | Only engine with server recognition and custom language models. Fallback for everything else. |
+| `appleSpeechAnalyzer` | `SpeechAnalyzerEngine` — `SpeechAnalyzer` + `SpeechTranscriber` (`.progressiveTranscription`), iOS 26+ | Keyboard + app | Newer on-device system model, no bundle cost. Used only when `SpeechTranscriber.isAvailable`, the locale is supported, and its assets are installed (`AssetInventory`). Public FLEURS runs report roughly half the German WER of the classic recognizer; to be confirmed in 2.0. Keyboard memory with the model loaded is unverified on device. |
+| `parakeet` | `ParakeetSpeechEngine` — NVIDIA Parakeet Ultra (post-trained TDT 0.6B v3, 25 European languages) via FluidAudio / Core ML | **Containing app only** | Batch: transcribes on `stop()`, no partial results. Models (~650 MB) are downloaded only on explicit user action in Settings. Lives in the separate `VoiceFlowParakeet` package, which the keyboard target never links. |
+| `whisper` | `WhisperSpeechEngine` — OpenAI Whisper via WhisperKit 1.1.1 / Core ML; model `VoiceFlowSettings.whisperModel`: `base` (~150 MB), `small` (~480 MB), `large-v3-turbo` (~632 MB, default) | **Containing app only** | Batch: records a 16 kHz mono WAV in the temp directory, transcribes on `stop()`, then deletes it. Vocabulary goes in as decoder prompt tokens (max. 50 terms). `automatic` locale mode lets Whisper detect the language (copes with German / English mixes). `WhisperModelManager` (long-lived in `AppModel`) downloads from `argmaxinc/whisperkit-coreml` when the user taps *Download* in Settings or dictates for the first time after choosing Whisper, keeps one loaded instance, loads an already downloaded model in the background when Dictate appears, and unloads it when another engine is chosen. Model files are excluded from backup. Early device use: `base` already works well for German dictation — measure in 2.0 against the larger variants. |
+| `automatic` (default) | — | Keyboard + app | `SpeechAnalyzer` when ready, else classic. Classic when the user allows server recognition and does not prefer on-device. Never picks an app-only engine. |
+
+Each `DictationRecord` stores the engine that actually ran (`engine`, after fallback), shown in History, so the same corpus can be compared per engine. Records and settings from builds before engine selection (`"apple"`) still decode: the record as `appleClassic`, the setting as `automatic`.
+
+### Engine selection
+
+- **Keyboard Extension:** `SpeechEngineFactory.makeEngine(host: .keyboardExtension)`. Parakeet and Whisper resolve to the best Apple engine. `SpeechAnalyzer` is used only if its assets are already installed — the keyboard never waits on or starts an asset download.
+- **Containing app:** `host: .containingApp`, with an app-engine provider. Parakeet returns an engine only when its models are on disk (else Apple fallback). Whisper downloads / loads the chosen model first (Dictate shows a *preparing model* state with Cancel) and surfaces a load failure instead of falling back silently.
+- **Assets:** the containing app's Settings shows the `SpeechTranscriber` asset state for the current dictation language and an *Install* button (Apple's own system asset download). Parakeet models get *Download* / *Delete* buttons; Whisper gets a model picker plus *Download and load* / *Load* / *Delete download*.
+- **Shared capture:** Apple, SpeechAnalyzer, and Parakeet use `MicrophoneCapture` (audio session, input tap, level metering, interruption / media-services / route-change detection). `WhisperSpeechEngine` still records with `AVAudioRecorder`; moving it onto `MicrophoneCapture` is a cleanup follow-up.
 
 ### Locale handling
 
@@ -106,6 +117,7 @@ Vocabulary is applied at two points:
 
 1. **At recognition time** — Apple Speech has no free-form prompt, but accepts `contextualStrings` on the recognition request and custom language models (`SFCustomLanguageModelData`, iOS 17+). Whisper takes an initial prompt with the glossary.
    - **Implemented:** `SpeechEngine.contextualStrings`; callers pass `VocabularyCorrector.recognitionHints(from:)` — the `correction` of every active entry, deduplicated, most used first, capped at 100.
+   - Per engine: `AppleSpeechEngine` sets them on the recognition request. `SpeechAnalyzerEngine` passes them as `AnalysisContext.contextualStrings[.general]`; whether `SpeechTranscriber` honors them is unverified (Phase 2.0). `WhisperSpeechEngine` passes up to 50 as decoder prompt tokens. `ParakeetSpeechEngine` ignores them — TDT has no prompt; FluidAudio's CTC keyword boosting (second ~110M encoder, batch only) is a possible follow-up. Stage 1 correction pairs apply to every engine.
    - **Pending:** custom language model. It must be prepared in the containing app (slow) and handed to the keyboard via the App Group; on-device recognition only.
 2. **After recognition** — deterministic correction pairs in Stage 1.
    - **Implemented:** `VocabularyCorrector.apply` replaces active `heard` phrases (case-insensitive, whole words, flexible whitespace, longest first) and keeps sentence-start capitalization. Applied entry IDs bump `useCount`. Normalization then runs on the corrected text (see *Correction levels*).

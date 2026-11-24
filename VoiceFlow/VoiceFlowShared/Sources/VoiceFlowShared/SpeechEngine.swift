@@ -133,7 +133,7 @@ public enum SpeechLocaleResolver {
         return englishDefault
     }
 
-    static func normalize(_ identifier: String) -> String {
+    public static func normalize(_ identifier: String) -> String {
         // Drop calendar / collation keywords such as `de_DE@calendar=gregorian`.
         let base = identifier.split(separator: "@").first.map(String.init) ?? identifier
         return base.replacingOccurrences(of: "_", with: "-")

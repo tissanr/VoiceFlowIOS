@@ -16,6 +16,8 @@ public struct DictationRecord: Codable, Equatable, Identifiable, Sendable {
     public var insertedAt: Date?
     /// The user's corrected version, set when they edit the dictation in History.
     public var editedText: String?
+    /// Engine that produced `rawText`; nil for records from builds before the engine switch (Apple Speech).
+    public var engine: SpeechEngineKind?
 
     public init(
         id: DictationID = DictationID(),
@@ -29,7 +31,8 @@ public struct DictationRecord: Codable, Equatable, Identifiable, Sendable {
         accuracyRatio: Double? = nil,
         state: DictationState,
         insertedAt: Date? = nil,
-        editedText: String? = nil
+        editedText: String? = nil,
+        engine: SpeechEngineKind? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -43,6 +46,7 @@ public struct DictationRecord: Codable, Equatable, Identifiable, Sendable {
         self.state = state
         self.insertedAt = insertedAt
         self.editedText = editedText
+        self.engine = engine
     }
 
     /// The best available text: the user's edit, else the postprocessed text.

@@ -1,6 +1,6 @@
 # VoiceFlow iOS — Roadmap
 
-> **Last updated:** 2026-11-23
+> **Last updated:** 2026-11-24
 > **Purpose:** Index of specifications, implementation status, and phase plan. The detailed product spec lives in [`docs/specs/`](docs/specs/) — start there for any deep dive.
 
 ---
@@ -26,7 +26,7 @@ Start here to see where the project is. The table is intentionally split by subp
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.3 Fallback containing-app handoff flow | 🟥 Not started | Requires Phase 0 handoff and App Group assumptions to stay valid. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.4 Manual insert + unsupported-field fallback | 🟥 Not started | Covers `UITextDocumentProxy.insertText(...)`, Secure Fields, Phone Pads, disabled keyboards, and clipboard fallback. |
 | Phase 1 — Keyboard MVP with Secure-Field handling | 1.5 MVP onboarding, accessibility, and diagnostics baseline | 🟥 Not started | Covers activation flow, Open Access trade-off, VoiceOver labels, Dynamic Type baseline, and MetricKit surfacing. |
-| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.0 ASR quality benchmark | 🟥 Not started | WER benchmark on a fixed German / English dictation corpus: `SFSpeechRecognizer`, iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit `large-v3-turbo`, Parakeet TDT v3. Verdict decides the engine the postprocessing pipeline is tuned against and whether Phase 5 starts. |
+| Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.0 ASR quality benchmark | 🟧 In progress | All candidate engines are selectable in the app (Settings → Recognition engine) and each dictation records its engine: `SFSpeechRecognizer`, iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, Parakeet Ultra, Whisper base / small / large-v3-turbo. First device impression: Whisper base (~150 MB) already works well for German. Next: record the fixed German / English / mixed corpus and measure WER, latency, and memory per engine. Verdict confirms the `automatic` default and the engine postprocessing is tuned against. |
 | Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.1 `PostProcessor` rule pipeline | 🟩 Done | Stage 1: deterministic correction-pair replacement + normalization. Runs before any LLM stage. `PostProcessor` runs `VocabularyCorrector` then `TextNormalizer` (whitespace, punctuation spacing, inner sentence-start capitalization, terminal period at `medium`) per correction level in keyboard and app; unit-tested. Next: Stage 2 LLM adapter (2.3). |
 | Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.2 Vocabulary learning + management UI | 🟨 Awaiting review / blocked | Learn from raw vs. corrected text; show, edit, delete, and disable vocabulary entries. Implemented: vocabulary as `contextualStrings`, learning from History edits and keyboard post-edits into confirm-first suggestions, Words / History / Dictate / Settings UI in the containing app. Blocked on real-device validation and human privacy review of keyboard post-edit learning. Custom language model (`SFCustomLanguageModelData`) not started. |
 | Phase 2 — Postprocessing, Vocabulary, Accessibility hardening | 2.3 LLM adapter interface + guardrails | 🟥 Not started | Stage 2: on-device Apple Foundation Models adapter (iOS 26+, Apple Intelligence devices, runtime-gated) with a constrained task scope, guided generation, and segment-wise processing. Remote LLM remains gated by explicit privacy review. |
@@ -38,8 +38,8 @@ Start here to see where the project is. The table is intentionally split by subp
 | Phase 4 — Robustness, Edge Cases, Performance Budgets | 4.2 App Group sync hardening | 🟥 Not started | Low-memory behavior, fast app switching, and poor-condition sync validation. |
 | Phase 4 — Robustness, Edge Cases, Performance Budgets | 4.3 Lowest-device performance validation | 🟥 Not started | Re-measure all numeric budgets on the lowest-supported device class. |
 | Phase 4 — Robustness, Edge Cases, Performance Budgets | 4.4 Layout and RTL hardening | 🟥 Not started | Landscape, small displays, RTL layout safety, and logical-order insertion. |
-| Phase 5 — Offline ASR | 5.1 Offline ASR integration | 🟥 Not started | Starts if the 2.0 benchmark shows a clear WER advantage over Apple Speech. Runs in the containing app only (keyboard memory budget). |
-| Phase 5 — Offline ASR | 5.2 Fully local mode decision | 🟥 Not started | Decide whether the integrated non-Apple engine (WhisperKit or Parakeet via Core ML) meaningfully improves privacy, quality, or reliability. |
+| Phase 5 — Offline ASR | 5.1 Offline ASR integration | 🟧 In progress | Pulled forward by product decision (2026-11-24): `ParakeetSpeechEngine` (FluidAudio 0.18.4, Parakeet Ultra) and `WhisperSpeechEngine` (WhisperKit 1.1.1) in the app-only `VoiceFlowParakeet` / `VoiceFlowWhisper` packages, opt-in model downloads, never linked into the keyboard. Both batch only; Whisper takes vocabulary as prompt, Parakeet has no vocabulary boosting yet. Pending: real-device validation (latency, memory, battery), privacy review of the model download, and the 2.0 WER verdict before it becomes a recommended setting. |
+| Phase 5 — Offline ASR | 5.2 Fully local mode decision | 🟥 Not started | Decide whether the integrated non-Apple engines (Whisper and Parakeet via Core ML) meaningfully improve privacy, quality, or reliability, and which one to recommend. |
 | Phase 6 — Release Readiness | 6.1 Release privacy package | 🟥 Not started | Final permission copy, privacy text, nutrition label, and App Review narrative. |
 | Phase 6 — Release Readiness | 6.2 Data deletion, export, and backup | 🟥 Not started | User-facing controls for history and vocabulary lifecycle. |
 | Phase 6 — Release Readiness | 6.3 Release pipeline and submission readiness | 🟥 Not started | fastlane, TestFlight, App Store Connect, active engine display, and final review pass. |
@@ -60,11 +60,11 @@ VoiceFlow does not replace Apple's system dictation. It runs as a custom keyboar
 | --- | --- | --- | --- |
 | [architecture](docs/specs/architecture.md) | iOS assumptions, dual-flow design, MVP scope, user flows, target architecture, core technologies | Accepted (v1) | 🟧 In progress (shared model package wired; app and keyboard implementations pending) |
 | [data-and-storage](docs/specs/data-and-storage.md) | App Group identifiers, storage layout, state and data models, shared-store concurrency protocol | Accepted (v3) | 🟧 In progress (`PendingInsert` shared-store handoff verified under contention; JSON file stores for history, vocabulary, settings implemented; device validation pending) |
-| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v3) | 🟧 In progress (`SpeechEngine` + `AppleSpeechEngine` implemented; vocabulary hints, correction pairs, learning, and Stage 1 normalization implemented; custom LM pending; device validation pending; engine choice reopened for 2.0 benchmark) |
+| [speech-and-postprocessing](docs/specs/speech-and-postprocessing.md) | Audio session, `SpeechEngine`, postprocessing pipeline, vocabulary, guardrails | Accepted (v4) | 🟧 In progress (selectable engines: `AppleSpeechEngine`, iOS 26 `SpeechAnalyzerEngine`, app-only `ParakeetSpeechEngine` and `WhisperSpeechEngine`; vocabulary hints, correction pairs, learning, and Stage 1 normalization implemented; custom LM pending; device validation pending; default confirmed by 2.0 benchmark) |
 | [keyboard-and-insert](docs/specs/keyboard-and-insert.md) | Keyboard UI states, insert path, edge cases (marked text, RTL, masked fields, undo grouping), `InsertGuard` | Accepted (v1) | 🟧 In progress (state shell, primary-flow insert with verification + clipboard fallback, vocabulary, and post-edit learning implemented; `InsertGuard` and host-app validation pending) |
 | [performance-and-memory](docs/specs/performance-and-memory.md) | Numeric memory / latency / energy budgets and validation procedure | Accepted (v1) | 🟥 Not started (budgets unverified) |
 | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) | VoiceOver, Dynamic Type, contrast, RTL safety, `Localizable.xcstrings`, mixed-language dictation | Accepted (v2) | 🟥 Not started (dictation locale defaults clarified) |
-| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v3) | 🟨 Awaiting review (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written) |
+| [privacy-and-app-review](docs/specs/privacy-and-app-review.md) | Permissions, Open Access policy, telemetry, App Review narrative, privacy nutrition label | Accepted (v3) | 🟨 Awaiting review (`RequestsOpenAccess` enabled; MetricKit selected; privacy / App Review / onboarding draft written; user-initiated speech-model downloads to review) |
 | [build-and-ci](docs/specs/build-and-ci.md) | Local build commands, CI pipeline, code signing, fastlane | Accepted (v3) | 🟧 In progress (GitHub Actions Swift package workflow path fixed; Xcode app build CI pending) |
 | [testing](docs/specs/testing.md) | Phase 0 spike tests, required iOS test versions, MVP acceptance tests, Phase 4 regression matrix | Accepted (v2) | 🟧 In progress (`VoiceFlowShared` tests and App Group contention spike harness exist) |
 | [agent-tooling](docs/specs/agent-tooling.md) | Dev-only: guardrail checks for coding agents, agent-neutral roles and workflows, Claude Code hooks/adapters, CI guardrail job | Accepted (v1) | 🟧 In progress (checks, three roles, two workflows, hooks, CI job landed; `spike-verdict` workflow and sim-runner role pending) |
@@ -135,7 +135,7 @@ Drafts:
 
 **Status:** 🟧 In progress
 
-- **ASR quality benchmark (2.0)** — record a fixed corpus (≥10 typical dictations, German, English, mixed, domain terms) and measure WER per engine: `SFSpeechRecognizer` (with `contextualStrings`), iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit `large-v3-turbo` (with vocabulary prompt), Parakeet TDT v3 (FluidAudio / Core ML). Also record latency, peak memory, and model size. Postprocessing is tuned against the winning engine, not before.
+- **ASR quality benchmark (2.0)** — record a fixed corpus (≥10 typical dictations, German, English, mixed, domain terms) and measure WER per engine: `SFSpeechRecognizer` (with `contextualStrings`), iOS 26 `SpeechAnalyzer` / `SpeechTranscriber`, Parakeet Ultra (FluidAudio / Core ML), Whisper base / small / large-v3-turbo (WhisperKit, with vocabulary prompt). All are selectable in the app's Settings. Also record latency, peak memory, and model size. Postprocessing is tuned against the winning engine, not before.
 - **Fix errors at the source first:** pass vocabulary into recognition (`contextualStrings` / custom language model on Apple Speech, initial prompt on Whisper) before relying on postprocessing.
 - `PostProcessor` as a staged pipeline:
   1. Deterministic: correction pairs from vocabulary, normalization (punctuation, whitespace, capitalization).
@@ -184,11 +184,11 @@ Drafts:
 
 ---
 
-### Phase 5 — Offline ASR (gated by the 2.0 benchmark)
+### Phase 5 — Offline ASR
 
-**Status:** 🟥 Not started
+**Status:** 🟧 In progress (Whisper and Parakeet integrations pulled forward 2026-11-24; recommendation still gated by the 2.0 benchmark)
 
-- Integrate the winning non-Apple engine from 2.0 (WhisperKit `large-v3-turbo` or Parakeet TDT v3 via Core ML). tiny / base / small Whisper models are not a quality target for German.
+- Whisper (WhisperKit; base / small / large-v3-turbo) and Parakeet Ultra (FluidAudio) are integrated as opt-in engines (`VoiceFlowWhisper`, `VoiceFlowParakeet` packages). Whisper base already performs well for German on device; the benchmark decides whether the smaller or larger variants are worth their size.
 - Containing app only: model sizes (to be confirmed by the 2.0 benchmark; expected in the hundreds of MB to GB range) are far beyond the ~48 MB Keyboard Extension budget. High-quality mode therefore uses the containing-app flow; the keyboard keeps Apple Speech.
 - Model download on demand, not bundled.
 - Evaluate batch vs. streaming.
@@ -196,7 +196,7 @@ Drafts:
 - Compare quality against Apple Speech.
 - Define "fully local" privacy mode.
 
-**Exit criterion:** custom ASR ships only if the 2.0 benchmark shows a clear, measured WER advantage over Apple Speech for German / mixed dictation.
+**Exit criterion:** a non-Apple engine is recommended (or made a default anywhere) only if the 2.0 benchmark shows a clear, measured WER advantage over Apple Speech for German / mixed dictation. Until then it stays an opt-in setting.
 
 ---
 
@@ -240,7 +240,7 @@ Drafts:
 | MVP LLM: local, remote, or interface only? | Interface + local rules in MVP. Remote LLM gated on a separate explicit privacy review. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) |
 | Minimum iOS version? | iOS 17.0. | [min-iOS investigation](docs/spikes/min-ios-investigation.md) |
 | Crash reporting? | MetricKit first for MVP diagnostics, supplemented by local App Group breadcrumbs; third-party crash SDKs deferred unless TestFlight proves the first-party path insufficient. | [crash-reporting spike](docs/spikes/crash-reporting.md) |
-| Speech recognition engine? | `SFSpeechRecognizer` for MVP; on-device support checked per locale at runtime. **Reopened 2026-11-09:** Apple recognition quality on German is a known concern; final engine choice moves to the 2.0 WER benchmark (Apple Speech, `SpeechAnalyzer`, WhisperKit, Parakeet). | [Apple Speech locale spike](docs/spikes/apple-speech-locale-availability.md) |
+| Speech recognition engine? | `SFSpeechRecognizer` for MVP; on-device support checked per locale at runtime. **Reopened 2026-11-09:** Apple recognition quality on German is a known concern; final engine choice moves to the 2.0 WER benchmark. **2026-11-24:** engines made selectable — default `automatic` (iOS 26 `SpeechAnalyzer` when its assets are installed, else `SFSpeechRecognizer`); Parakeet and Whisper opt-in in the containing app. The benchmark confirms the default and which non-Apple engine to recommend. | [Apple Speech locale spike](docs/spikes/apple-speech-locale-availability.md) |
 | Launch languages? | German + English; mixed German / English dictation supported. | [accessibility-and-localization](docs/specs/accessibility-and-localization.md) |
 | Audio temporarily storable for debugging? | Off by default; opt-in only. | [privacy-and-app-review](docs/specs/privacy-and-app-review.md) |
 | Keyboard-extension history size? | Last 5 entries loaded eagerly; full history only via the containing app. | [performance-and-memory](docs/specs/performance-and-memory.md) |
@@ -260,7 +260,7 @@ Drafts:
 | No insert in Secure Fields | iOS replaces custom keyboard with system keyboard | Detected pre-record in Phase 1; communicate clearly |
 | Apple Speech unavailable offline | Locale / device / iOS dependency | Per-locale availability check at runtime; allow online mode or evaluate Whisper later |
 | LLM hallucinates formatting | Generative model | Guardrails + fallback to raw text; LLM disabled by default; LLM scope limited to formatting, never content correction |
-| Apple Speech WER too high for German / domain terms | System model quality, no domain adaptation | Vocabulary at recognition time; 2.0 benchmark; Whisper / Parakeet path in containing app |
+| Apple Speech WER too high for German / domain terms | System model quality, no domain adaptation | Vocabulary at recognition time; iOS 26 `SpeechAnalyzer` by default where installed; opt-in Whisper / Parakeet in containing app; 2.0 benchmark |
 | High-quality ASR cannot run in the keyboard | Model sizes (measured in 2.0) far exceed the ~48 MB extension budget | High-quality mode via containing-app flow; keyboard stays on Apple Speech |
 | On-device LLM unavailable on many devices | Foundation Models needs iOS 26 + Apple Intelligence hardware; min iOS is 17 | Runtime availability check; deterministic stage works everywhere; LLM stage optional |
 | App Group race conditions | Cross-process suite sync | `SharedStoreClient` file lock + generation-counter protocol with `consumedGen` tombstone |
