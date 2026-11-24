@@ -1,6 +1,8 @@
 import Foundation
 import Observation
+import VoiceFlowParakeet
 import VoiceFlowShared
+import VoiceFlowWhisper
 
 enum AppTab: Hashable {
     case dictate, history, words, settings
@@ -17,6 +19,8 @@ final class AppModel {
     var selectedTab: AppTab = .dictate
     /// Shown in Settings so the Open Access spike can observe `voiceflow://` launches.
     var lastOpenedURL: URL?
+    /// Long-lived so the Whisper model loads once, not per dictation.
+    let whisper: WhisperModelManager
 
     private let vocabularyStore: VocabularyStore?
     private let historyStore: DictationHistoryStore?
@@ -26,6 +30,8 @@ final class AppModel {
         vocabularyStore = try? VocabularyStore.appGroup()
         historyStore = try? DictationHistoryStore.appGroup()
         settingsStore = try? SettingsStore.appGroup()
+        let initialSettings = settingsStore?.load() ?? .defaults
+        whisper = WhisperModelManager(variant: initialSettings.whisperModel)
         if vocabularyStore == nil || historyStore == nil || settingsStore == nil {
             errorMessage = "The shared App Group container is unavailable. Check the app's entitlements."
         }
@@ -54,6 +60,21 @@ final class AppModel {
             history = try historyStore?.records() ?? []
         }
         settings = settingsStore?.load() ?? .defaults
+        whisper.select(settings.whisperModel)
+    }
+
+    /// Loads an already downloaded app-only model (Whisper / Parakeet) in the background so the first dictation starts quickly.
+    /// Never starts a download on its own: that is an explicit user action in Settings.
+    func warmUpSpeechEngine() async {
+        switch settings.speechEngine {
+        case .whisper:
+            guard whisper.state == .downloaded else { return }
+            await whisper.prepare()
+        case .parakeet:
+            ParakeetModelStore.shared.warmUp()
+        default:
+            break
+        }
     }
 
     // MARK: - Vocabulary
@@ -119,6 +140,11 @@ final class AppModel {
         do {
             try settingsStore?.save(next)
             settings = next
+            whisper.select(next.whisperModel)
+            if next.speechEngine != .whisper {
+                // A loaded large Whisper model holds hundreds of MB; release it when not in use.
+                whisper.unload()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -131,6 +157,26 @@ final class AppModel {
             history = try historyStore?.records() ?? history
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+extension WhisperModelManager {
+    /// Human-readable model state for Dictate and Settings.
+    var statusText: String {
+        switch state {
+        case .notDownloaded:
+            return "Not downloaded (about \(variant.approximateSizeMB) MB)"
+        case .downloading(let progress):
+            return "Downloading model… \(Int(progress * 100)) %"
+        case .downloaded:
+            return "Downloaded, not loaded"
+        case .loading:
+            return "Loading model… The first load after download can take a few minutes."
+        case .ready:
+            return "Ready"
+        case .failed(let message):
+            return "Failed: \(message)"
         }
     }
 }

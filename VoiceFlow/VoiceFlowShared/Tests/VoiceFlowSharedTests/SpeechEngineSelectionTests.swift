@@ -2,8 +2,8 @@ import XCTest
 @testable import VoiceFlowShared
 
 final class SpeechEngineSelectionTests: XCTestCase {
-    private let allReady = SpeechEngineAvailability(speechAnalyzerReady: true, parakeetReady: true)
-    private let noneReady = SpeechEngineAvailability(speechAnalyzerReady: false, parakeetReady: false)
+    private let allReady = SpeechEngineAvailability(speechAnalyzerReady: true, appEngineReady: true)
+    private let noneReady = SpeechEngineAvailability(speechAnalyzerReady: false, appEngineReady: false)
 
     private func resolve(
         _ preference: SpeechEngineKind,
@@ -47,9 +47,27 @@ final class SpeechEngineSelectionTests: XCTestCase {
     }
 
     func testParakeetWithoutModelsFallsBackToBestAppleEngine() {
-        let analyzerOnly = SpeechEngineAvailability(speechAnalyzerReady: true, parakeetReady: false)
+        let analyzerOnly = SpeechEngineAvailability(speechAnalyzerReady: true, appEngineReady: false)
         XCTAssertEqual(resolve(.parakeet, availability: analyzerOnly), .appleSpeechAnalyzer)
         XCTAssertEqual(resolve(.parakeet, availability: noneReady), .appleClassic)
+    }
+
+    func testWhisperRunsOnlyInContainingApp() {
+        XCTAssertEqual(resolve(.whisper, host: .containingApp, availability: allReady), .whisper)
+        XCTAssertEqual(resolve(.whisper, host: .keyboardExtension, availability: allReady), .appleSpeechAnalyzer)
+        XCTAssertEqual(resolve(.whisper, host: .keyboardExtension, availability: noneReady), .appleClassic)
+    }
+
+    func testLegacyAppleSettingMapsToAutomatic() throws {
+        let data = Data(#"{"speechEngine":"apple","whisperModel":"openai_whisper-base"}"#.utf8)
+        let settings = try JSONDecoder().decode(VoiceFlowSettings.self, from: data)
+        XCTAssertEqual(settings.speechEngine, .automatic)
+        XCTAssertEqual(settings.whisperModel, .base)
+    }
+
+    func testLegacyRecordEnginesStillDecode() throws {
+        XCTAssertEqual(try JSONDecoder().decode(SpeechEngineKind.self, from: Data(#""apple""#.utf8)), .appleClassic)
+        XCTAssertEqual(try JSONDecoder().decode(SpeechEngineKind.self, from: Data(#""whisper""#.utf8)), .whisper)
     }
 
     func testSettingsDecodeWithoutEngineDefaultsToAutomatic() throws {

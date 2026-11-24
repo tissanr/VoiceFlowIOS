@@ -10,6 +10,7 @@
 		D4CD20022FA1000000736CEE /* VoiceFlowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20002FA1000000736CEE /* VoiceFlowShared */; };
 		D4CD20032FA1000000736CEE /* VoiceFlowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20012FA1000000736CEE /* VoiceFlowShared */; };
 		D4CD20062FA1000000736CEE /* VoiceFlowParakeet in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20052FA1000000736CEE /* VoiceFlowParakeet */; };
+		D4CD20092FA1000000736CEE /* VoiceFlowWhisper in Frameworks */ = {isa = PBXBuildFile; productRef = D4CD20082FA1000000736CEE /* VoiceFlowWhisper */; };
 		D4CD11692FA0FFE400736CEE /* VoiceFlowKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D4CD11622FA0FFE400736CEE /* VoiceFlowKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -108,6 +109,7 @@
 			files = (
 				D4CD20022FA1000000736CEE /* VoiceFlowShared in Frameworks */,
 				D4CD20062FA1000000736CEE /* VoiceFlowParakeet in Frameworks */,
+				D4CD20092FA1000000736CEE /* VoiceFlowWhisper in Frameworks */,
 			);
 		};
 		D4CD113E2FA0FF8E00736CEE /* Frameworks */ = {
@@ -175,6 +177,7 @@
 			packageProductDependencies = (
 				D4CD20002FA1000000736CEE /* VoiceFlowShared */,
 				D4CD20052FA1000000736CEE /* VoiceFlowParakeet */,
+				D4CD20082FA1000000736CEE /* VoiceFlowWhisper */,
 			);
 			productName = VoiceFlow;
 			productReference = D4CD11342FA0FF8D00736CEE /* VoiceFlow.app */;
@@ -281,6 +284,7 @@
 			packageReferences = (
 				D4CD20042FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowShared" */,
 				D4CD20072FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowParakeet" */,
+				D4CD200A2FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowWhisper" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = D4CD11352FA0FF8D00736CEE /* Products */;
@@ -743,6 +747,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = VoiceFlowParakeet;
 		};
+		D4CD200A2FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowWhisper" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = VoiceFlowWhisper;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -760,6 +768,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D4CD20072FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowParakeet" */;
 			productName = VoiceFlowParakeet;
+		};
+		D4CD20082FA1000000736CEE /* VoiceFlowWhisper */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D4CD200A2FA1000000736CEE /* XCLocalSwiftPackageReference "VoiceFlowWhisper" */;
+			productName = VoiceFlowWhisper;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

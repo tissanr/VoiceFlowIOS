@@ -11,6 +11,8 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
     public var learnFromKeyboardEdits: Bool
     /// Which recognizer to use. Resolved per host by `SpeechEngineSelection`.
     public var speechEngine: SpeechEngineKind
+    /// Whisper model used when `speechEngine == .whisper`.
+    public var whisperModel: WhisperModelVariant
 
     public init(
         localeMode: LocaleMode = .automatic,
@@ -20,7 +22,8 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
         allowLLMProcessing: Bool = false,
         privacyMode: PrivacyMode = .localOnly,
         learnFromKeyboardEdits: Bool = true,
-        speechEngine: SpeechEngineKind = .automatic
+        speechEngine: SpeechEngineKind = .automatic,
+        whisperModel: WhisperModelVariant = .largeV3Turbo
     ) {
         self.localeMode = localeMode
         self.correctionLevel = correctionLevel
@@ -30,6 +33,7 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
         self.privacyMode = privacyMode
         self.learnFromKeyboardEdits = learnFromKeyboardEdits
         self.speechEngine = speechEngine
+        self.whisperModel = whisperModel
     }
 
     /// Tolerates settings saved by older builds: missing keys fall back to defaults.
@@ -43,10 +47,19 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
         allowLLMProcessing = try container.decodeIfPresent(Bool.self, forKey: .allowLLMProcessing) ?? defaults.allowLLMProcessing
         privacyMode = try container.decodeIfPresent(PrivacyMode.self, forKey: .privacyMode) ?? defaults.privacyMode
         learnFromKeyboardEdits = try container.decodeIfPresent(Bool.self, forKey: .learnFromKeyboardEdits) ?? defaults.learnFromKeyboardEdits
-        speechEngine = (try? container.decodeIfPresent(SpeechEngineKind.self, forKey: .speechEngine)) ?? defaults.speechEngine
+        // `try?`: an engine or model a future build removed falls back to the default instead of failing all settings.
+        speechEngine = Self.engine(fromRaw: try? container.decodeIfPresent(String.self, forKey: .speechEngine)) ?? defaults.speechEngine
+        whisperModel = (try? container.decodeIfPresent(WhisperModelVariant.self, forKey: .whisperModel)) ?? defaults.whisperModel
     }
 
     public static let defaults = VoiceFlowSettings()
+
+    /// Builds before engine selection stored `"apple"` as the default; that maps to `automatic`.
+    private static func engine(fromRaw raw: String??) -> SpeechEngineKind? {
+        guard let raw = raw.flatMap({ $0 }) else { return nil }
+        if raw == SpeechEngineKind.legacyAppleRawValue { return .automatic }
+        return SpeechEngineKind(rawValue: raw)
+    }
 }
 
 public enum LocaleMode: String, Codable, Equatable, CaseIterable, Sendable {
@@ -64,4 +77,30 @@ public enum CorrectionLevel: String, Codable, Equatable, CaseIterable, Sendable 
 public enum PrivacyMode: String, Codable, Equatable, CaseIterable, Sendable {
     case localOnly
     case externalLLMAllowed
+}
+
+/// WhisperKit model folders from `argmaxinc/whisperkit-coreml`. All are multilingual.
+public enum WhisperModelVariant: String, Codable, Equatable, CaseIterable, Sendable {
+    case base = "openai_whisper-base"
+    case small = "openai_whisper-small"
+    case largeV3Turbo = "openai_whisper-large-v3-v20240930_turbo_632MB"
+
+    /// Approximate download size, for the settings UI.
+    public var approximateSizeMB: Int {
+        switch self {
+        case .base: return 150
+        case .small: return 480
+        case .largeV3Turbo: return 632
+        }
+    }
+}
+
+extension WhisperModelVariant {
+    public var displayName: String {
+        switch self {
+        case .base: return "Base"
+        case .small: return "Small"
+        case .largeV3Turbo: return "Large v3 Turbo"
+        }
+    }
 }

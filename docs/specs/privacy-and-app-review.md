@@ -27,12 +27,13 @@ Draft permission-string direction lives in [../spikes/privacy-app-review-onboard
 
 ### Speech-model downloads
 
-Two engines need model files that are not part of the app bundle (see [speech-and-postprocessing.md](speech-and-postprocessing.md) → *Speech engine*). Both downloads are started **only by an explicit user action** in the containing app's Settings, never automatically and never from the Keyboard Extension:
+Three engines need model files that are not part of the app bundle (see [speech-and-postprocessing.md](speech-and-postprocessing.md) → *Speech engine*). All downloads are started **only by an explicit user action** in the containing app, never in the background and never from the Keyboard Extension:
 
 - **Apple `SpeechTranscriber` assets** — *Install* button; Apple's own system asset download through `AssetInventory`, the same mechanism as on-device dictation.
 - **Parakeet models** (~650 MB) — *Download* button; fetched from Hugging Face (`FluidInference/parakeet-ultra-coreml`) by FluidAudio. FluidAudio is held in offline mode (`ModelHub.offlineMode`) at all other times so no model fetch can happen silently. *Delete* removes the files.
+- **Whisper models** (~150 / 480 / 632 MB) — *Download and load* in Settings, or the first dictation after the user chose Whisper; fetched from Hugging Face (`argmaxinc/whisperkit-coreml`) by WhisperKit. An already downloaded model is only loaded, never re-fetched in the background. *Delete download* removes the files; they are excluded from backup.
 
-Neither download sends audio, text, vocabulary, or identifiers; recognition stays on device for both engines. **Needs human review:** the third-party download host (Hugging Face) must be reflected in the privacy nutrition label decision and the App Review narrative, and the Settings wording for these buttons is unreviewed product copy.
+No download sends audio, text, vocabulary, or identifiers; recognition stays on device for both engines. **Needs human review:** the third-party download host (Hugging Face) must be reflected in the privacy nutrition label decision and the App Review narrative, and the Settings wording for these buttons is unreviewed product copy.
 
 ---
 

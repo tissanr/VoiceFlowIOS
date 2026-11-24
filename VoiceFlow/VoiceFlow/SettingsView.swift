@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import VoiceFlowParakeet
 import VoiceFlowShared
+import VoiceFlowWhisper
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
@@ -26,13 +27,25 @@ struct SettingsView: View {
                         Text("Apple (classic)").tag(SpeechEngineKind.appleClassic)
                         Text("Apple SpeechAnalyzer").tag(SpeechEngineKind.appleSpeechAnalyzer)
                         Text("Parakeet (app only)").tag(SpeechEngineKind.parakeet)
+                        Text("Whisper (app only)").tag(SpeechEngineKind.whisper)
                     }
                     appleModelRow
-                    parakeetRow
+                    if model.settings.speechEngine == .parakeet {
+                        parakeetRow
+                    }
+                    if model.settings.speechEngine == .whisper {
+                        Picker("Whisper model", selection: binding(\.whisperModel)) {
+                            ForEach(WhisperModelVariant.allCases, id: \.self) { variant in
+                                Text("\(variant.displayName) · ~\(variant.approximateSizeMB) MB").tag(variant)
+                            }
+                        }
+                        LabeledContent("Status", value: model.whisper.statusText)
+                        whisperActions
+                    }
                 } header: {
                     Text("Recognition engine")
                 } footer: {
-                    Text("Automatic uses Apple's newer on-device model (iOS 26) when it is installed, otherwise the classic recognizer. Parakeet runs only in this app; the keyboard falls back to Apple. All engines run on this device.")
+                    Text("Automatic uses Apple's newer on-device model (iOS 26) when it is installed, otherwise the classic recognizer. Parakeet and Whisper run only in this app and are downloaded once from Hugging Face; text appears after you tap Stop. The keyboard falls back to Apple. All engines run on this device; your audio never leaves it.")
                 }
 
                 Section {
@@ -112,6 +125,27 @@ struct SettingsView: View {
             Button("Retry download") {
                 parakeet.download()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var whisperActions: some View {
+        switch model.whisper.state {
+        case .notDownloaded, .failed:
+            Button("Download and load model") {
+                Task { await model.whisper.prepare() }
+            }
+        case .downloaded:
+            Button("Load model") {
+                Task { await model.whisper.prepare() }
+            }
+            Button("Delete download", role: .destructive) { model.whisper.deleteDownload() }
+        case .downloading(let progress):
+            ProgressView(value: progress)
+        case .loading:
+            ProgressView()
+        case .ready:
+            Button("Delete download", role: .destructive) { model.whisper.deleteDownload() }
         }
     }
 

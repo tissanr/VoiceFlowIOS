@@ -384,7 +384,8 @@ final class KeyboardViewController: UIInputViewController {
         let hints = VocabularyCorrector.recognitionHints(from: vocabulary)
         Task { [weak self] in
             // Keyboard host: never Parakeet; SpeechAnalyzer only when its assets are installed.
-            let (engine, _) = await SpeechEngineFactory.makeEngine(settings: settings, locale: locale, host: .keyboardExtension)
+            // No app-engine provider here, so this cannot throw; `try?` keeps the keyboard on the safe path.
+            guard let (engine, _) = try? await SpeechEngineFactory.makeEngine(settings: settings, locale: locale, host: .keyboardExtension) else { return }
             guard let self, currentDictationID == self.dictationID, case .recording = self.shellState else { return }
             engine.delegate = self
             engine.contextualStrings = hints
