@@ -9,6 +9,8 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
     public var privacyMode: PrivacyMode
     /// Let the keyboard compare text it inserted with the user's later edit and suggest vocabulary.
     public var learnFromKeyboardEdits: Bool
+    /// Which recognizer to use. Resolved per host by `SpeechEngineSelection`.
+    public var speechEngine: SpeechEngineKind
 
     public init(
         localeMode: LocaleMode = .automatic,
@@ -17,7 +19,8 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
         preferOnDeviceSpeech: Bool = true,
         allowLLMProcessing: Bool = false,
         privacyMode: PrivacyMode = .localOnly,
-        learnFromKeyboardEdits: Bool = true
+        learnFromKeyboardEdits: Bool = true,
+        speechEngine: SpeechEngineKind = .automatic
     ) {
         self.localeMode = localeMode
         self.correctionLevel = correctionLevel
@@ -26,6 +29,7 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
         self.allowLLMProcessing = allowLLMProcessing
         self.privacyMode = privacyMode
         self.learnFromKeyboardEdits = learnFromKeyboardEdits
+        self.speechEngine = speechEngine
     }
 
     /// Tolerates settings saved by older builds: missing keys fall back to defaults.
@@ -39,6 +43,7 @@ public struct VoiceFlowSettings: Codable, Equatable, Sendable {
         allowLLMProcessing = try container.decodeIfPresent(Bool.self, forKey: .allowLLMProcessing) ?? defaults.allowLLMProcessing
         privacyMode = try container.decodeIfPresent(PrivacyMode.self, forKey: .privacyMode) ?? defaults.privacyMode
         learnFromKeyboardEdits = try container.decodeIfPresent(Bool.self, forKey: .learnFromKeyboardEdits) ?? defaults.learnFromKeyboardEdits
+        speechEngine = (try? container.decodeIfPresent(SpeechEngineKind.self, forKey: .speechEngine)) ?? defaults.speechEngine
     }
 
     public static let defaults = VoiceFlowSettings()

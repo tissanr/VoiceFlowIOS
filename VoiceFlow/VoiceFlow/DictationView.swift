@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import VoiceFlowParakeet
 import VoiceFlowShared
 
 /// In-app dictation with the user's vocabulary. Also the place to try new words
@@ -121,31 +122,48 @@ final class DictationController: SpeechEngineDelegate {
     private(set) var inputLevel: Float = 0
     private(set) var errorText: String?
 
-    @ObservationIgnored private var engine: AppleSpeechEngine?
+    @ObservationIgnored private var engine: SpeechEngine?
+    /// Incremented per start so a slow engine setup cannot revive a cancelled dictation.
+    @ObservationIgnored private var startID = 0
     @ObservationIgnored private weak var model: AppModel?
 
     func start(model: AppModel) {
         errorText = nil
         partialText = ""
         self.model = model
-        let engine = AppleSpeechEngine(settings: model.settings)
-        engine.delegate = self
-        engine.contextualStrings = model.recognitionHints
-        self.engine = engine
         phase = .recording
+        startID += 1
+        let currentStartID = startID
 
-        let locale = AppleSpeechEngine.resolvedLocale(for: model.settings)
+        let settings = model.settings
+        let locale = AppleSpeechEngine.resolvedLocale(for: settings)
+        let hints = model.recognitionHints
         Task {
+            let (engine, _) = await SpeechEngineFactory.makeEngine(
+                settings: settings,
+                locale: locale,
+                host: .containingApp,
+                parakeet: { ParakeetSpeechEngine.makeIfReady() }
+            )
+            guard currentStartID == startID, phase == .recording else { return }
+            engine.delegate = self
+            engine.contextualStrings = hints
+            self.engine = engine
             do {
                 try await engine.start(locale: locale)
             } catch {
+                guard currentStartID == startID else { return }
                 fail(error)
             }
         }
     }
 
     func stop(model: AppModel) {
-        guard let engine else { return }
+        guard let engine else {
+            // Stopped before the engine finished setting up: nothing was recorded.
+            cancel()
+            return
+        }
         phase = .transcribing
         Task {
             do {
@@ -165,6 +183,7 @@ final class DictationController: SpeechEngineDelegate {
     }
 
     func reset() {
+        startID += 1
         engine = nil
         partialText = ""
         inputLevel = 0

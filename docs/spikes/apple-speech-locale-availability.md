@@ -80,7 +80,7 @@ The recognition request should set:
 
 ## Non-goals
 
-- Do not adopt iOS 26 `SpeechAnalyzer`, `SpeechTranscriber`, or `DictationTranscriber` for MVP.
+- Do not adopt iOS 26 `SpeechAnalyzer`, `SpeechTranscriber`, or `DictationTranscriber` for MVP. *(Superseded 2026-11-24: `SpeechAnalyzerEngine` now ships behind availability checks with `SFSpeechRecognizer` as fallback; see [speech-and-postprocessing.md](../specs/speech-and-postprocessing.md).)*
 - Do not ship Whisper / Core ML in MVP.
 - Do not use remote LLMs for recognition.
 - Do not send audio to any remote service.

@@ -1,8 +1,8 @@
 # Spec: Privacy & App Review
 
 > **Spec status:** Accepted (v3)
-> **Implementation status:** In progress (`RequestsOpenAccess` enabled; Open Access behavior harness wired; MetricKit selected; privacy / App Review / onboarding draft written, human review pending)
-> **Last updated:** 2026-11-10
+> **Implementation status:** In progress (`RequestsOpenAccess` enabled; Open Access behavior harness wired; MetricKit selected; privacy / App Review / onboarding draft written, human review pending; speech-model downloads added 2026-11-24, human review pending)
+> **Last updated:** 2026-11-24
 > **Owners:** product + iOS
 
 Permissions, privacy posture, telemetry, and the App Store Review narrative. App-Review-sensitive — read before changing user-facing wording.
@@ -14,7 +14,7 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 | Permission | Why | When asked |
 | --- | --- | --- |
 | Microphone | Recording in the keyboard (primary) and in the app (fallback) | At first dictation; explained in onboarding |
-| Speech Recognition | `SFSpeechRecognizer` for raw transcript | At first dictation; explained in onboarding |
+| Speech Recognition | `SFSpeechRecognizer` and iOS 26 `SpeechAnalyzer` for raw transcript | At first dictation; explained in onboarding. Not requested for Parakeet, which only needs the microphone |
 | Open Access (Full Access) | Enables in-keyboard recording (primary flow), `openURL` from extension, smoother App Group sync | Recommended in onboarding; the MVP works without it via fallback flow |
 
 ### Permission copy
@@ -24,6 +24,15 @@ Permissions, privacy posture, telemetry, and the App Store Review narrative. App
 The containing app now also declares both strings (for in-app dictation in the Dictate tab), using the same wording as the keyboard extension. Both copies are still unreviewed.
 
 Draft permission-string direction lives in [../spikes/privacy-app-review-onboarding-draft.md](../spikes/privacy-app-review-onboarding-draft.md). It is not final shipping copy until human review signs it off.
+
+### Speech-model downloads
+
+Two engines need model files that are not part of the app bundle (see [speech-and-postprocessing.md](speech-and-postprocessing.md) → *Speech engine*). Both downloads are started **only by an explicit user action** in the containing app's Settings, never automatically and never from the Keyboard Extension:
+
+- **Apple `SpeechTranscriber` assets** — *Install* button; Apple's own system asset download through `AssetInventory`, the same mechanism as on-device dictation.
+- **Parakeet models** (~650 MB) — *Download* button; fetched from Hugging Face (`FluidInference/parakeet-ultra-coreml`) by FluidAudio. FluidAudio is held in offline mode (`ModelHub.offlineMode`) at all other times so no model fetch can happen silently. *Delete* removes the files.
+
+Neither download sends audio, text, vocabulary, or identifiers; recognition stays on device for both engines. **Needs human review:** the third-party download host (Hugging Face) must be reflected in the privacy nutrition label decision and the App Review narrative, and the Settings wording for these buttons is unreviewed product copy.
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Spec status:** Accepted (v1)
 > **Implementation status:** In progress (shared model package wired; app and keyboard implementations pending)
-> **Last updated:** 2026-04-29
+> **Last updated:** 2026-11-24
 > **Owners:** product + iOS
 
 ---
@@ -236,7 +236,7 @@ Current shared package path: [../../VoiceFlow/VoiceFlowShared](../../VoiceFlow/V
 | Persistence | SwiftData in the App Group container for history and vocabulary |
 | Extension comms | App Groups + locked suite preferences + SwiftData |
 | Shortcuts | App Intents |
-| Later offline ASR | WhisperKit or Parakeet via Core ML (containing app only; chosen by Phase 2.0 benchmark) |
+| Offline ASR | Parakeet via FluidAudio / Core ML, containing app only, opt-in model download (`VoiceFlowParakeet` package); iOS 26 `SpeechAnalyzer` in both hosts |
 
 ---
 
